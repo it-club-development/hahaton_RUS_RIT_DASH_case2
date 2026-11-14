@@ -73,8 +73,6 @@ public sealed class UsersController : ControllerBase
         if (!updated)
             return NotFound();
 
-        // Если администратор изменил собственную запись,
-        // текущие claims/cookie уже могут быть устаревшими.
         if (TryGetCurrentUserId(out var currentUserId) && currentUserId == id)
             await HttpContext.SignOutAsync();
 

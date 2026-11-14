@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebOtchet.DTO.Incidents;
 using WebOtchet.Services;
-
+using WebOtchet.Services.Helpers;
 namespace WebOtchet.Controllers.Api;
 
 [ApiController]
@@ -11,10 +11,12 @@ namespace WebOtchet.Controllers.Api;
 public sealed class IncidentsController : ControllerBase
 {
     private readonly IncidentService _service;
+    private readonly ICurrentUser _currentUser;
 
-    public IncidentsController(IncidentService service)
+    public IncidentsController(IncidentService service, ICurrentUser currentUser)
     {
         _service = service;
+        _currentUser = currentUser;
     }
 
     [HttpGet("{id:guid}")]
@@ -33,7 +35,7 @@ public sealed class IncidentsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Attendant")]
     [ValidateAntiForgeryToken]
     [ProducesResponseType<IncidentResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -41,8 +43,14 @@ public sealed class IncidentsController : ControllerBase
         [FromBody] IncidentWriteRequest request,
         CancellationToken cancellationToken)
     {
+        var currentUser = _currentUser.User;
+
+        if (currentUser is null)
+            return Unauthorized();
+
         var incident = await _service.CreateAsync(
             request.ToEntity(),
+            currentUser,
             cancellationToken
         );
 
@@ -56,7 +64,7 @@ public sealed class IncidentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Attendant")]
     [ValidateAntiForgeryToken]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -67,9 +75,14 @@ public sealed class IncidentsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var incident = request.ToEntity(id);
+var currentUser = _currentUser.User;
+
+if (currentUser is null)
+    return Unauthorized();
 
         var updated = await _service.UpdateAsync(
             incident,
+            currentUser,
             cancellationToken
         );
 
@@ -77,7 +90,7 @@ public sealed class IncidentsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Attendant")] 
     [ValidateAntiForgeryToken]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -85,7 +98,12 @@ public sealed class IncidentsController : ControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
-        var deleted = await _service.DeleteAsync(id, cancellationToken);
+        var currentUser = _currentUser.User;
+
+        if (currentUser is null)
+            return Unauthorized();
+
+        var deleted = await _service.DeleteAsync(id, currentUser, cancellationToken);
 
         return deleted ? NoContent() : NotFound();
     }

@@ -125,14 +125,18 @@ public sealed class IncidentService
 
     public async Task<Incident> CreateAsync(
         Incident incident,
+        AuthenticatedUser currentUser,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(incident);
 
+        if (!CanCreateIncident(currentUser))
+        throw new UnauthorizedAccessException(
+            "Недостаточно прав для создания аварии.");
         ValidateAndNormalize(incident);
 
-        if (incident.Id == Guid.Empty)
             incident.Id = Guid.NewGuid();
+            incident.CreatedByUserId = currentUser.Id;
 
         CalculateDerivedFields(incident);
 
@@ -147,6 +151,7 @@ public sealed class IncidentService
 
     public async Task<bool> UpdateAsync(
         Incident incident,
+        AuthenticatedUser currentUser,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(incident);
@@ -155,6 +160,9 @@ public sealed class IncidentService
             throw new ValidationException(
                 "Не указан идентификатор аварии."
             );
+        if (!CanManageIncident(currentUser,incident))
+        throw new UnauthorizedAccessException(
+            "Недостаточно прав для изменения записи.");
 
         ValidateAndNormalize(incident);
 
@@ -169,13 +177,17 @@ public sealed class IncidentService
 
     public async Task<bool> DeleteAsync(
         Guid id,
+        AuthenticatedUser currentUser,
         CancellationToken cancellationToken = default)
     {
         if (id == Guid.Empty)
             throw new ValidationException(
                 "Некорректный ID аварии."
             );
-
+        var incident = await _repository.GetByIdAsync(id); 
+        if (!CanManageIncident(currentUser,incident))
+        throw new UnauthorizedAccessException(
+            "Недостаточно прав для удаления записи.");
         return await _repository.DeleteAsync(
             id,
             cancellationToken
@@ -399,9 +411,13 @@ public sealed class IncidentService
 
     private static void RefreshLength(Incident incident)
     {
-        var endTime = incident.EndTime ?? DateTime.Now;
+        if(!incident.EndTime.HasValue)
+        {
+            incident.Length="00:00:00";
+            return;
+        }
 
-        var duration = endTime - incident.BeginTime;
+        var duration = incident.EndTime.Value - incident.BeginTime;
 
         if (duration < TimeSpan.Zero)
         {
@@ -421,4 +437,24 @@ public sealed class IncidentService
             duration.Seconds
         );
     }
+private static bool CanCreateIncident(AuthenticatedUser user)
+{
+    return user.Role is Roles.Admin or Roles.Attendant;
 }
+
+private static bool CanManageIncident(
+    AuthenticatedUser user,
+    Incident incident)
+{
+    return user.Role switch
+    {
+        Roles.Admin => true,
+
+        Roles.Attendant =>
+            incident.CreatedByUserId == user.Id,
+
+        Roles.Engineer => false,
+
+        _ => false
+    };
+}}

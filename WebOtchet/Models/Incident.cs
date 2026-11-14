@@ -22,4 +22,7 @@ public class Incident
     public TimeSpan? CommonStationTime { get; set; }
     public string AlarmWho { get; set; } = "";
     public string NoticeDescription { get; set; } = "";
+
+    public Guid? CreatedByUserId { get; set; }
+    public User? CreatedByUser { get; set; }
 }

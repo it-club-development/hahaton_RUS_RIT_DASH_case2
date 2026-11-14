@@ -117,6 +117,11 @@ public sealed class IncidentConfiguration
 
         builder.HasIndex(x => x.BeginTime)
             .HasDatabaseName("IX_INCIDENTS_BEGIN_TIME");
+
+        builder.HasOne(i => i.CreatedByUser)
+    .WithMany()
+    .HasForeignKey(i => i.CreatedByUserId)
+    .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
