@@ -14,7 +14,12 @@ public class Incident
     public string AlarmType { get; set; } = "";
     public string Description { get; set; } = "";
     public DateTime BeginTime { get; set; }
-    public DateTime? EndTime { get; set; }
+    private DateTime? _endTime;
+    public DateTime? EndTime
+    {
+        get => _endTime;
+        set => _endTime = value == DateTime.MinValue ? null : value;
+    }
     public TimeSpan? Akb { get; set; }
     public TimeSpan? GeneratorTime { get; set; }
     public string Length { get; set; } = "";

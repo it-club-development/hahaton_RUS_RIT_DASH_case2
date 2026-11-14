@@ -1,21 +1,45 @@
 services:
-  db:
-    image: mariadb:12.3.3-noble
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     environment:
-      MARIADB_DATABASE: webotchet
-      MARIADB_USER: webotchet
-      MARIADB_PASSWORD: ${WEBOTCHET_DB_PASSWORD:?Set WEBOTCHET_DB_PASSWORD in .env}
-      MARIADB_RANDOM_ROOT_PASSWORD: '1'
+      ASPNETCORE_ENVIRONMENT: Production
+      Hosting__LocalHttp: "true"
+      Hosting__DataProtectionPath: /app/keys
+      TZ: ${WEBOTCHET_TZ:-Asia/Yekaterinburg}
+      ConnectionStrings__MariaDb: "Server=db;Port=3306;Database=webotchet;User ID=webotchet;Password=${WEBOTCHET_DB_PASSWORD};"
+      Bootstrap__Initialize: "true"
+      Bootstrap__Username: ${WEBOTCHET_ADMIN_USER:-admin}
+      Bootstrap__Password: ${WEBOTCHET_ADMIN_PASSWORD:-}
     ports:
-      - "127.0.0.1:${WEBOTCHET_DB_PORT:-3307}:3306"
+      - "127.0.0.1:${WEBOTCHET_APP_PORT:-5126}:8080"
     volumes:
-      - mariadb-data:/var/lib/mysql
+      - app-keys:/app/keys
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:10.1.48
+    platform: linux/amd64
+    environment:
+      MYSQL_DATABASE: webotchet
+      MYSQL_USER: webotchet
+      MYSQL_PASSWORD: ${WEBOTCHET_DB_PASSWORD:?Set WEBOTCHET_DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${WEBOTCHET_DB_ROOT_PASSWORD:?Set WEBOTCHET_DB_ROOT_PASSWORD in .env}
+    command: ["--sql-mode=STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_general_ci"]
+    ports:
+      - "127.0.0.1:${WEBOTCHET_DB_PORT:-3306}:3306"
+    volumes:
+      - mariadb-10-1-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u\"$$MYSQL_USER\" -p\"$$MYSQL_PASSWORD\" \"$$MYSQL_DATABASE\" -e 'SELECT 1' >/dev/null 2>&1"]
       interval: 5s
       timeout: 5s
       retries: 30
 
 volumes:
-  mariadb-data:
+  mariadb-10-1-data:
+  app-keys:
 

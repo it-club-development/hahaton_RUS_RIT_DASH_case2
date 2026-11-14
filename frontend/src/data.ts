@@ -1,12 +1,11 @@
-export type User = 'admin' | 'engineer';
 export const fields = ['ticket','direction','center','category','network','type','element','stations','equipment','start','end','interruption','battery','generator','description','notified','details'] as const;
 export type Field = typeof fields[number];
 export type Incident = Partial<Record<Field, string>> & {
   id: string;
+  createdByUserId?: string | null;
   start: string;
   open: boolean;
 };
-export function canEdit(user: User) { return user === 'admin'; }
 
 export const lists = {
  direction:['ХМЯН','СВН','ЮЗН','Вся сеть'],
@@ -21,7 +20,7 @@ export function localDate(date: Date) {
 export function duration(record: Pick<Incident, "start" | "end" | "open">) {
  if(!record.start || (!record.open && !record.end)) return null;
  const seconds=Math.floor(((record.open?Date.now():new Date(record.end || "").getTime())-new Date(record.start).getTime())/1000);
- return Number.isFinite(seconds)&&seconds>=0?seconds:null;
+ return Number.isFinite(seconds) ? Math.max(0, seconds) : null;
 }
 export function downtime(record: Pick<Incident, "interruption" | "stations">) {
  if(!/^\d{1,3}:[0-5]\d:[0-5]\d$/.test((record.interruption || ""))||!/^\d+$/.test(record.stations || "")) return null;
@@ -36,28 +35,5 @@ export function dateLabel(value: string) {
  return value ? new Date(value).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'НВ';
 }
 
-export function filterByPeriod(rows: Incident[], hours: string, now = Date.now()) {
- if (!hours) return rows;
- const from = now - Number(hours) * 3600000;
- return rows.filter(record => {
-  const start = new Date(record.start).getTime();
-  return start >= from && start <= now;
- });
-}
 
-function csvCell(value: unknown) {
- let safe=String(value==null?'':value);
- if(/^[\s]*[=+@-]/.test(safe)) safe="'"+safe;
- return '"'+safe.replace(/"/g,'""')+'"';
-}
-export function downloadCsv(records: Incident[]) {
- const headings=['PW / NTT','Направление','ТЦ','Категория','Тип сети','Сетевой элемент','Количество БС','Тип оборудования','Тип аварии','Краткое описание','Начало','Окончание','АКБ','ГУ','Длительность','Прерывание связи','Общий простой','Кого уведомили','Подробное описание'];
- const rows=records.map(row=>[row.ticket,row.direction,row.center,row.category,row.network,row.element,row.stations,row.equipment,row.type,row.description,row.start,row.end||'НВ',row.battery,row.generator,clock(duration(row)),row.interruption,clock(downtime(row)),row.notified,row.details]);
- const csv=[headings, ...rows].map(row=>row.map(csvCell).join(';')).join('\r\n');
- const url=URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}));
- const link=document.createElement('a');
- link.href=url;link.download='motiv-incidents.csv';
- document.body.appendChild(link);link.click();link.remove();
- setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
 

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using WebOtchet.Data;
 using WebOtchet.Models;
+using WebOtchet.DTO.Incidents;
 using WebOtchet.Repositories.IRepository;
 
 namespace WebOtchet.Repositories.Repository;
@@ -16,19 +17,25 @@ public sealed class IncidentRepository : IIncidentRepository
 
     private IQueryable<Incident> GetPeriodQuery(
         DateTime from,
-        DateTime to)
+        DateTime to, IncidentReportFilter? filter)
     {
         if (to <= from)
             throw new ArgumentException(
                 "Дата окончания периода должна быть позже даты начала."
             );
 
-        return _context.Incidents
-            .AsNoTracking()
-            .Where(x =>
-                x.BeginTime >= from &&
-                x.BeginTime < to
-            );
+        var source = filter?.Status switch
+        {
+            "open" => _context.Incidents.FromSqlRaw("SELECT * FROM INCIDENTS WHERE END_TIME IS NULL OR END_TIME = '0000-00-00 00:00:00'"),
+            "closed" => _context.Incidents.FromSqlRaw("SELECT * FROM INCIDENTS WHERE END_TIME IS NOT NULL AND END_TIME <> '0000-00-00 00:00:00'"),
+            _ => _context.Incidents,
+        };
+        var query = source.AsNoTracking().Where(row => row.BeginTime >= from && row.BeginTime < to);
+        if (!string.IsNullOrEmpty(filter?.Direction))
+            query = query.Where(row => row.Direction == filter.Direction);
+        if (!string.IsNullOrEmpty(filter?.Center))
+            query = query.Where(row => row.TechCenter == filter.Center);
+        return query;
     }
 
     public async Task<Incident?> GetByIdAsync(
@@ -48,6 +55,7 @@ public sealed class IncidentRepository : IIncidentRepository
         DateTime to,
         int skip,
         int take,
+        IncidentReportFilter? filter = null,
         CancellationToken cancellationToken = default)
     {
         if (skip < 0)
@@ -56,9 +64,11 @@ public sealed class IncidentRepository : IIncidentRepository
         if (take <= 0)
             throw new ArgumentOutOfRangeException(nameof(take));
 
-        return await GetPeriodQuery(from, to)
-            .OrderByDescending(x => x.BeginTime)
-            .ThenBy(x => x.Id)
+        var query = GetPeriodQuery(from, to, filter);
+        var ordered = filter?.Sort == "asc"
+            ? query.OrderBy(x => x.BeginTime)
+            : query.OrderByDescending(x => x.BeginTime);
+        return await ordered
             .ThenBy(x => x.Id)
             .Skip(skip)
             .Take(take)
@@ -68,11 +78,17 @@ public sealed class IncidentRepository : IIncidentRepository
     public async Task<int> CountByPeriodAsync(
         DateTime from,
         DateTime to,
+        IncidentReportFilter? filter = null,
         CancellationToken cancellationToken = default)
     {
-        return await GetPeriodQuery(from, to)
+        return await GetPeriodQuery(from, to, filter)
             .CountAsync(cancellationToken);
     }
+
+    public IAsyncEnumerable<IncidentReportValue> GetReportValues(DateTime from, DateTime to, IncidentReportFilter filter) =>
+        GetPeriodQuery(from, to, filter)
+            .Select(row => new IncidentReportValue(row.Direction, row.EndTime, row.CommonStationTime))
+            .AsAsyncEnumerable();
 
     public async Task AddAsync(
         Incident incident,
@@ -106,6 +122,7 @@ public sealed class IncidentRepository : IIncidentRepository
         if (existing is null)
             return false;
 
+        incident.CreatedByUserId = existing.CreatedByUserId;
         _context.Entry(existing)
             .CurrentValues
             .SetValues(incident);
@@ -113,6 +130,17 @@ public sealed class IncidentRepository : IIncidentRepository
         await _context.SaveChangesAsync(cancellationToken);
 
         return true;
+    }
+
+    public async Task<bool> CloseAsync(Incident incident, CancellationToken cancellationToken = default)
+    {
+        var id = incident.Id.ToString("D");
+        var updated = await _context.Database.ExecuteSqlInterpolatedAsync($@"
+            UPDATE INCIDENTS SET END_TIME = {incident.EndTime}, LENGHT = {incident.Length}
+            WHERE ID = {id} AND BEGIN_TIME = {incident.BeginTime}
+              AND (END_TIME IS NULL OR END_TIME = '0000-00-00 00:00:00')", cancellationToken);
+
+        return updated == 1;
     }
 
     public async Task<bool> DeleteAsync(

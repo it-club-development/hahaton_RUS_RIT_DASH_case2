@@ -37,7 +37,8 @@ public sealed class IncidentConfiguration
 
         builder.Property(x => x.Category)
             .HasColumnName("KATEG")
-            .HasColumnType("tinyint unsigned")
+            .HasConversion<sbyte>()
+            .HasColumnType("tinyint")
             .IsRequired();
 
         builder.Property(x => x.NetworkType)
@@ -52,7 +53,9 @@ public sealed class IncidentConfiguration
 
         builder.Property(x => x.NumberOfBaseStations)
             .HasColumnName("NUMB_RBS")
-            .HasMaxLength(20)
+            .HasColumnType("int")
+            .HasConversion(value => value == "С" ? 0 : int.Parse(value, System.Globalization.CultureInfo.InvariantCulture),
+                value => value == 0 ? "С" : value.ToString(System.Globalization.CultureInfo.InvariantCulture))
             .IsRequired();
 
         builder.Property(x => x.EquipmentType)
@@ -77,6 +80,7 @@ public sealed class IncidentConfiguration
 
         builder.Property(x => x.EndTime)
             .HasColumnName("END_TIME")
+            .UsePropertyAccessMode(PropertyAccessMode.Property)
             .HasColumnType("datetime")
             .IsRequired(false);
 
@@ -101,8 +105,10 @@ public sealed class IncidentConfiguration
             .IsRequired(false);
 
         builder.Property(x => x.CommonStationTime)
-            .HasColumnName("COMMON_PROSTOY")
-            .HasColumnType("time")
+            .HasColumnName("COMMON_PROSTOY_SECONDS")
+            .HasColumnType("bigint")
+            .HasConversion(value => value!.Value.Ticks / TimeSpan.TicksPerSecond,
+                value => new TimeSpan(value * TimeSpan.TicksPerSecond))
             .IsRequired(false);
 
         builder.Property(x => x.AlarmWho)

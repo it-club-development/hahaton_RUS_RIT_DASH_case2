@@ -1,4 +1,7 @@
 .env
+.env.*
+!.env.example
+appsettings.Local.json
 **/node_modules/
 **/dist/
 **/bin/

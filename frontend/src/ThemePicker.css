@@ -1,0 +1,21 @@
+:root{--on-accent:#fff;--stripe:#f8faff;--active:#cbd9ff;--control:#fff;--danger:#a32837}
+:root[data-theme="dark"]{color-scheme:dark;--ink:#eef2fb;--muted:#b4c0d4;--blue:#9cb0ff;--on-accent:#10182a;--nav:#202b46;--line:#41516c;--paper:#1e283a;--bg:#141c2a;--control:#253249;--stripe:#243047;--active:#364c7a;--danger:#ff9ca6}
+:root[data-theme="gray"]{--ink:#202327;--muted:#4c525a;--blue:#4a515a;--nav:#e0e2e5;--line:#c5c9cf;--paper:#f5f5f6;--bg:#eaebed;--control:#fff;--stripe:#e9eaec;--active:#c9cdd2}
+:root[data-theme="custom"]{--blue:var(--custom-accent);--on-accent:var(--custom-on-accent);--bg:rgba(var(--custom-rgb),.055);--nav:rgba(var(--custom-rgb),.13);--active:rgba(var(--custom-rgb),.23);--stripe:rgba(var(--custom-rgb),.055);--line:rgba(var(--custom-rgb),.30)}
+:root[data-theme] header,:root[data-theme] .panel{background:var(--paper)}
+:root[data-theme] .btn,:root[data-theme] nav,:root[data-theme] .field input,:root[data-theme] .field select,:root[data-theme] .field textarea{border-color:var(--line)}
+:root[data-theme] nav button,:root[data-theme] .field,:root[data-theme] .notice,:root[data-theme] .link{color:var(--ink)}
+:root[data-theme] nav button[aria-current=page]{background:var(--active)}
+:root[data-theme] .btn,:root[data-theme] .field input,:root[data-theme] .field select,:root[data-theme] .field textarea,:root[data-theme] .report-period select,:root[data-theme] .downtime-day input{background:var(--control);color:var(--ink)}
+:root[data-theme] .field input:disabled{background:var(--stripe)}
+:root[data-theme] .btn.primary,:root[data-theme] th{background:var(--blue);color:var(--on-accent)}
+:root[data-theme] tbody tr:nth-child(even){background:var(--stripe)}
+:root[data-theme] .downtime-values li{border-color:var(--line)}
+:root[data-theme] .users-error,:root[data-theme] .login .notice,:root[data-theme] .incident-delete{color:var(--danger)}
+.incident-delete{margin-left:12px}
+.theme-picker{position:fixed;z-index:5;bottom:12px;left:10px}
+.theme-picker summary{list-style:none;cursor:pointer}
+.theme-picker summary::-webkit-details-marker{display:none}
+.theme-options{position:absolute;bottom:calc(100% + 8px);left:0;width:220px;padding:14px;box-shadow:0 8px 26px #17274933}
+.theme-options label + label{margin-top:12px}
+:root[data-theme] main,.shell nav{padding-bottom:70px}

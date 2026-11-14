@@ -98,6 +98,20 @@ public sealed class UsersController : ControllerBase
         return deleted ? NoContent() : NotFound();
     }
 
+    [HttpPost("{id:guid}/reset-password")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(
+        Guid id,
+        [FromBody] ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (TryGetCurrentUserId(out var currentUserId) && currentUserId == id)
+            return BadRequest(new ProblemDetails { Title = "Для своего пароля используйте смену пароля в профиле." });
+
+        var updated = await _service.ResetPasswordAsync(id, request.NewPassword, cancellationToken);
+        return updated ? NoContent() : NotFound();
+    }
+
     private bool TryGetCurrentUserId(out Guid id)
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier);

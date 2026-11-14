@@ -1,4 +1,4 @@
-﻿using Doka.EntityFrameworkCore.MySql;
+using Doka.EntityFrameworkCore.MySql;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -25,17 +25,7 @@ namespace WebOtchet.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<string>(
-                name: "CreatedByUserId",
-                table: "INCIDENTS",
-                type: "char(36)",
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "char(36)",
-                oldNullable: true)
-                .Annotation("Doka:MySql:RequiresExplicitBackfill", true)
-                .Annotation("Doka:MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.None)
-                .OldAnnotation("Doka:MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.None);
+            // The preceding migration now also leaves the column nullable.
         }
     }
 }

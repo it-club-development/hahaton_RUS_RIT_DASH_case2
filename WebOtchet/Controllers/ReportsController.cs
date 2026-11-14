@@ -29,6 +29,7 @@ public sealed class ReportsController : ControllerBase
     public async Task<IActionResult> GetIncidents(
         [FromQuery] DateTime from,
         [FromQuery] DateTime to,
+        [FromQuery] IncidentReportFilter filter,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
@@ -38,7 +39,8 @@ public sealed class ReportsController : ControllerBase
             to,
             page,
             pageSize,
-            cancellationToken
+            cancellationToken,
+            filter
         );
 
         var response = new PagedResponse<IncidentResponse>(
@@ -52,11 +54,18 @@ public sealed class ReportsController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("incidents/summary")]
+    public async Task<ActionResult<IncidentReportSummary>> GetSummary(
+        [FromQuery] DateTime from, [FromQuery] DateTime to,
+        [FromQuery] IncidentReportFilter filter, CancellationToken cancellationToken)
+        => Ok(await _service.GetSummaryAsync(from, to, filter, cancellationToken));
+
     [HttpGet("incidents.csv")]
     [Produces("text/csv")]
     public async Task<IActionResult> ExportIncidentsCsv(
         [FromQuery] DateTime from,
         [FromQuery] DateTime to,
+        [FromQuery] IncidentReportFilter filter,
         CancellationToken cancellationToken = default)
     {
         using var stream = new MemoryStream();
@@ -88,7 +97,8 @@ public sealed class ReportsController : ControllerBase
                 to,
                 page,
                 ExportBatchSize,
-                cancellationToken
+                cancellationToken,
+                filter
             );
 
             foreach (var incident in result.Items)
@@ -129,7 +139,7 @@ public sealed class ReportsController : ControllerBase
             x.AlarmType,
             x.Description,
             FormatDateTime(x.BeginTime),
-            x.EndTime.HasValue ? FormatDateTime(x.EndTime.Value) : "НВ",
+            x.EndTime is { } end && end != DateTime.MinValue ? FormatDateTime(end) : "НВ",
             FormatTime(x.Akb),
             FormatTime(x.GeneratorTime),
             x.Length,
