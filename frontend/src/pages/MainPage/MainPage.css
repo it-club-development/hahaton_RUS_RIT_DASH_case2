@@ -1,0 +1,17 @@
+.filters{padding:17px;display:flex;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}.filters>*{margin:3px 12px 3px 0}.filters>*:last-child{margin-right:0}.filters label{flex:1 1 126px}
+.table-scroll{overflow:auto;border-radius:11px 11px 0 0}table{width:100%;border-collapse:collapse;text-align:left;min-width:820px}th{background:var(--blue);color:white;font-size:13px;font-weight:650;white-space:nowrap}th,td{padding:13px 15px;border-bottom:1px solid var(--line)}td{font-size:14px}tbody tr:nth-child(even){background:#f8faff}td:nth-child(1),td:nth-child(6),td:nth-child(7){white-space:nowrap}.status{display:inline-block;border-radius:20px;padding:3px 9px;background:#e8f6ee;color:#1b6040;font-size:12px;white-space:nowrap}.status.open{background:#fff1ce;color:#785000}.link{border:0;background:none;color:#264fc8;font-weight:650;padding:0}.foot{padding:13px 16px;color:var(--muted);font-size:13px}.empty{padding:30px;color:var(--muted);text-align:center}
+.report-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+.report-chart{padding:18px}
+.report-chart h3{margin:0 0 8px}
+.report-period,.downtime-day{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px}
+#downtime-day-help{font-size:.875rem}
+.report-chart p{margin:0 0 12px}
+.chart-content{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.chart-content canvas{width:112px;height:112px}
+.chart-content ul{list-style:none;margin:0;padding:0;flex:1;min-width:150px}
+.chart-content li{margin:5px 0}
+.downtime-values{list-style:none;margin:0 0 12px;padding:0}
+.downtime-values li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #e1e8f2}
+.downtime-values strong{white-space:nowrap;font-variant-numeric:tabular-nums}
+.chart-key{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+@media(max-width:780px){.report-charts{grid-template-columns:1fr}}
