@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мотив · Веб-отчётность</title>
+<style>
+:root{--ink:#172749;--muted:#536682;--blue:#3158d9;--nav:#e5ecff;--line:#dce5f3;--paper:#fff;--bg:#f5f8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,"Segoe UI",Arial,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #7994ff;outline-offset:2px}
+header{height:76px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 30px;justify-content:space-between}.brand{display:flex;align-items:center;font-weight:750;font-size:22px}.mark{display:grid;place-items:center;width:38px;height:38px;margin-right:12px;border-radius:11px;background:var(--blue);color:white;font-size:21px}.header-note{color:var(--muted);font-size:13px}
+.shell{display:flex;min-height:calc(100vh - 76px)}nav{width:106px;flex:none;background:var(--nav);border-right:1px solid #d7e2ff;padding:24px 10px}nav button{width:100%;margin-bottom:9px;background:transparent;border:0;border-radius:10px;color:#345183;font-size:12px;font-weight:650;padding:12px 2px}nav button[aria-current=page]{background:#cbd9ff;color:#1d43bf}nav span{display:block;font-size:23px;line-height:1.2;margin-bottom:5px}
+main{width:calc(100% - 106px);max-width:1560px;margin:0 auto;padding:34px 42px 60px}h1,h2,p{margin-top:0}h1{font-size:34px;letter-spacing:-.7px;line-height:1.14;margin-bottom:8px}h2{font-size:18px;margin-bottom:0}.subtitle{color:var(--muted);margin:0}.heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}.heading-actions{display:flex;align-items:center}.heading-actions>*+*{margin-left:10px}
+.btn{display:inline-block;border:1px solid #c7d6f2;background:#fff;color:#254cae;border-radius:8px;padding:9px 14px;font-weight:650;white-space:nowrap}.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn:hover{filter:brightness(.95)}
+.panel{border:1px solid var(--line);border-radius:12px;background:white}.filters{padding:17px;display:flex;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}.filters>*{margin:3px 12px 3px 0}.filters>*:last-child{margin-right:0}.filters label{flex:1 1 126px}.field{display:block;color:#345070;font-size:13px;font-weight:650}.field input,.field select,.field textarea{display:block;margin-top:5px;width:100%;min-width:0;border:1px solid #cad7ed;border-radius:7px;background:white;padding:8px 10px;color:var(--ink);min-height:40px}.field input:disabled{background:#edf2fa}.field textarea{resize:vertical}.field input[type=checkbox]{display:inline-block;width:auto;min-height:0;vertical-align:middle;margin:0 5px 0 0}
+.table-scroll{overflow:auto;border-radius:11px 11px 0 0}table{width:100%;border-collapse:collapse;text-align:left;min-width:820px}th{background:var(--blue);color:white;font-size:13px;font-weight:650;white-space:nowrap}th,td{padding:13px 15px;border-bottom:1px solid var(--line)}td{font-size:14px}tbody tr:nth-child(even){background:#f8faff}td:nth-child(1),td:nth-child(6),td:nth-child(7){white-space:nowrap}.status{display:inline-block;border-radius:20px;padding:3px 9px;background:#e8f6ee;color:#1b6040;font-size:12px;white-space:nowrap}.status.open{background:#fff1ce;color:#785000}.link{border:0;background:none;color:#264fc8;font-weight:650;padding:0}.foot{padding:13px 16px;color:var(--muted);font-size:13px}.empty{padding:30px;color:var(--muted);text-align:center}.form-section{padding:19px 22px 22px;margin-bottom:14px}.form-section h2{border-bottom:1px solid var(--line);padding-bottom:11px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-gap:13px 24px}.wide{grid-column:1/-1}.check{align-self:end;padding-bottom:10px}.actions{display:flex;align-items:center;flex-wrap:wrap}.actions>*{margin:0 10px 6px 0}.notice{color:#284fa7;margin:0 0 12px}.summary{font-size:13px;color:var(--muted);margin:10px 0 0}[hidden]{display:none!important}
+@media(max-width:760px){main{padding:25px 15px;width:calc(100% - 75px)}nav{width:75px;padding:18px 3px}header{padding:0 14px}.heading{display:block}.heading-actions{margin-top:14px}.grid{grid-template-columns:minmax(0,1fr)}h1{font-size:28px}.form-section{padding:14px}.brand{font-size:18px}}@media(max-width:440px){.header-note{display:none}.heading-actions .btn{padding:8px}.heading-actions{flex-wrap:wrap}.heading-actions .btn{margin:0 6px 6px 0}}
+</style>
+</head>
+<body>
+<header><div class="brand"><span class="mark" aria-hidden="true">М</span>Веб-отчётность</div><div class="header-note">Мотив · локальная версия</div></header>
+<div class="shell">
+<nav aria-label="Разделы">
+<button type="button" id="report-tab" aria-current="page"><span aria-hidden="true">▤</span>Отчётность</button>
+<button type="button" id="incident-tab"><span aria-hidden="true">＋</span>Аварии</button>
+</nav>
+<main>
+<p class="notice" id="notice" role="status" hidden></p>
+<section id="report">
+<div class="heading"><div><h1 tabindex="-1">Отчётность</h1><p class="subtitle">Журнал аварий сотовой сети</p></div><div class="heading-actions"><button class="btn" id="export" type="button">Скачать CSV</button><button class="btn primary" id="new" type="button">Новый инцидент</button></div></div>
+<form class="filters panel" id="filters" aria-label="Фильтры отчёта">
+<label class="field">Начало периода<input type="date" name="from"></label>
+<label class="field">Конец периода<input type="date" name="to"></label>
+<label class="field">Направление<select name="direction"></select></label>
+<label class="field">Технический центр<select name="center"></select></label>
+<label class="field">Статус<select name="status"><option value="">Все</option><option value="open">Открыта</option><option value="closed">Закрыта</option></select></label>
+<button class="btn" type="reset">Сбросить</button>
+</form>
+<div class="panel"><div class="table-scroll"><table><thead><tr><th scope="col">Начало</th><th scope="col">PW / NTT</th><th scope="col">Направление</th><th scope="col">ТЦ</th><th scope="col">Сетевой элемент</th><th scope="col">Длительность</th><th scope="col">Статус</th><th scope="col">Действие</th></tr></thead><tbody id="rows"></tbody></table></div><div class="foot" id="count"></div></div>
+</section>
+<section id="incident" hidden>
+<div class="heading"><div><h1 id="form-title" tabindex="-1">Новый инцидент</h1><p class="subtitle">Карточка аварии базовой станции или сетевого элемента</p></div><button class="btn" id="back" type="button">К отчётности</button></div>
+<form id="incident-form">
+<div class="panel form-section"><h2>Основные сведения</h2><div class="grid">
+<label class="field">Номер или ссылка PW / NTT<input name="ticket" maxlength="450" required></label>
+<label class="field">Направление<select name="direction" required></select></label>
+<label class="field">Технический центр<select name="center" required></select></label>
+<label class="field">Категория<select name="category" required></select></label>
+<label class="field">Тип сети<select name="network" required></select></label>
+<label class="field">Тип аварии<select name="type" required></select></label>
+<label class="field">Сетевой элемент, услуга<input name="element" maxlength="450" required></label>
+<label class="field">Количество БС или «С» для сектора<input name="stations" maxlength="5" required placeholder="Например, 3"></label>
+<label class="field wide">Тип оборудования<input name="equipment" maxlength="450"></label>
+</div></div>
+<div class="panel form-section"><h2>Время и простой</h2><div class="grid">
+<label class="field">Начало<input type="datetime-local" name="start" required></label>
+<label class="field">Окончание<input type="datetime-local" name="end" required></label>
+<label class="field check"><input type="checkbox" name="open" checked>Авария продолжается (НВ)</label>
+<label class="field">Среднее время прерыва связи<input name="interruption" placeholder="чч:мм:сс" pattern="[0-9]{1,3}:[0-5][0-9]:[0-5][0-9]"></label>
+<label class="field">Время работы от АКБ<input name="battery" placeholder="чч:мм:сс" pattern="[0-9]{1,3}:[0-5][0-9]:[0-5][0-9]"></label>
+<label class="field">Время работы от генератора<input name="generator" placeholder="чч:мм:сс" pattern="[0-9]{1,3}:[0-5][0-9]:[0-5][0-9]"></label>
+</div><p class="summary" id="calculation" aria-live="polite"></p></div>
+<div class="panel form-section"><h2>Описание и уведомления</h2><div class="grid">
+<label class="field">Краткое описание<textarea name="description" rows="2" maxlength="450"></textarea></label>
+<label class="field">Кого уведомили<textarea name="notified" rows="2" maxlength="450"></textarea></label>
+<label class="field wide">Подробное описание<textarea name="details" rows="3" maxlength="450"></textarea></label>
+</div></div>
+<div class="actions"><button class="btn primary" type="submit">Сохранить инцидент</button><button class="btn" id="cancel" type="button">Отмена</button></div>
+</form>
+</section>
+</main></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const form = $('incident-form');
+const filters = $('filters');
+const fields = form.elements;
+const key = 'motiv-incidents-v1';
+const lists = {
+ direction:['ХМЯН','СВН','ЮЗН','Вся сеть'],
+ center:['НБР','АСБ','ИРБ','КРТ','НТГ','НТР','НУРЛ','НВРТ','НУРГ','ОКТ','СЛХ','СОВ','СРГ','ХМН','ЕКБ','КМУ','КРГ','НСР'],
+ category:['1','2','3'],network:['GSM','LTE','LTE/GSM'],
+ type:['РРС','ССС','ЭЛ','RBS','МСПД','ТМ','ОПС','ПР','АВР','Аренда']
+};
+Object.keys(lists).forEach(name => {
+ fields[name].add(new Option('Выберите значение',''));
+ lists[name].forEach(value => fields[name].add(new Option(value,value)));
+ if (filters.elements[name]) {
+  filters.elements[name].add(new Option('Все',''));
+  lists[name].forEach(value => filters.elements[name].add(new Option(value,value)));
+ }
+});
+function localDate(date) {
+ return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
+}
+function sample(){
+ const now=Date.now();
+ return [
+  {id:'sample-1',ticket:'NTT-1042',direction:'СВН',center:'ЕКБ',category:'2',network:'LTE',type:'ЭЛ',element:'БС Екатеринбург-12',stations:'3',start:localDate(new Date(now-74*60000)),end:'',open:true,interruption:'00:18:00'},
+  {id:'sample-2',ticket:'PW-1038',direction:'ЮЗН',center:'КМУ',category:'1',network:'GSM',type:'РРС',element:'БС Каменск-04',stations:'1',start:localDate(new Date(now-208*60000)),end:localDate(new Date(now-173*60000)),open:false,interruption:'00:12:00'},
+  {id:'sample-3',ticket:'NTT-1031',direction:'ХМЯН',center:'НУРГ',category:'3',network:'LTE/GSM',type:'RBS',element:'БС Новый Уренгой-09',stations:'2',start:localDate(new Date(now-1600*60000)),end:localDate(new Date(now-1550*60000)),open:false,interruption:'00:05:00'}
+ ];
+}
+let incidents;
+try {
+ const saved=JSON.parse(localStorage.getItem(key));
+ incidents=Array.isArray(saved)?saved:sample();
+} catch (error) { incidents=sample(); }
+let editing=null;
+const dataFields=['ticket','direction','center','category','network','type','element','stations','equipment','start','end','interruption','battery','generator','description','notified','details'];
+function setNotice(text) { $('notice').textContent=text; $('notice').hidden=!text; }
+function show(page,focus) {
+ const report=page==='report';
+ $('report').hidden=!report;
+ $('incident').hidden=report;
+ $('report-tab').removeAttribute('aria-current');
+ $('incident-tab').removeAttribute('aria-current');
+ $(report?'report-tab':'incident-tab').setAttribute('aria-current','page');
+ if(report) render();
+ if(focus) { $(page).querySelector('h1').focus(); window.scrollTo(0,0); }
+}
+function duration(record) {
+ if(!record.start || (!record.open && !record.end)) return null;
+ const seconds=Math.floor(((record.open?Date.now():new Date(record.end).getTime())-new Date(record.start).getTime())/1000);
+ return Number.isFinite(seconds)&&seconds>=0?seconds:null;
+}
+function downtime(record) {
+ if(!/^\d{1,3}:[0-5]\d:[0-5]\d$/.test(record.interruption)||!/^\d+$/.test(record.stations)) return null;
+ const parts=record.interruption.split(':').map(Number);
+ return (parts[0]*3600+parts[1]*60+parts[2])*Number(record.stations);
+}
+function clock(seconds) {
+ if(seconds===null) return '—';
+ return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,'0')).join(':');
+}
+function dateLabel(value) {
+ return value ? new Date(value).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'НВ';
+}
+function currentRows() {
+ const f=filters.elements;
+ return incidents.filter(row => {
+  const date=row.start.slice(0,10);
+  return (!f.from.value||date>=f.from.value)&&(!f.to.value||date<=f.to.value)&&
+   (!f.direction.value||row.direction===f.direction.value)&&(!f.center.value||row.center===f.center.value)&&
+   (!f.status.value||(f.status.value==='open')===row.open);
+ }).sort((a,b)=>b.start.localeCompare(a.start));
+}
+function render() {
+ const rows=currentRows();
+ const tbody=$('rows');
+ tbody.textContent='';
+ rows.forEach(record=>{
+  const tr=tbody.insertRow();
+  [dateLabel(record.start),record.ticket,record.direction,record.center,record.element,clock(duration(record))].forEach(value=>{tr.insertCell().textContent=value;});
+  const status=document.createElement('span');
+  status.className=record.open?'status open':'status';
+  status.textContent=record.open?'Открыта':'Закрыта';
+  tr.insertCell().appendChild(status);
+  const button=document.createElement('button');
+  button.type='button'; button.className='link'; button.textContent='Открыть';
+  button.setAttribute('aria-label','Открыть '+record.ticket);
+  button.addEventListener('click',()=>edit(record));
+  tr.insertCell().appendChild(button);
+ });
+ if(!rows.length){
+  const cell=tbody.insertRow().insertCell();
+  cell.colSpan=8; cell.className='empty'; cell.textContent='За выбранный период аварий нет.';
+ }
+ $('count').textContent='Показано записей: '+rows.length+' из '+incidents.length;
+ $('export').disabled=!rows.length;
+}
+function readForm(){
+ const record={open:fields.open.checked};
+ dataFields.forEach(name=>{record[name]=fields[name].value.trim();});
+ if(record.open) record.end='';
+ return record;
+}
+function updateForm(){
+ fields.end.disabled=fields.open.checked;
+ const record=readForm();
+ fields.stations.setCustomValidity(record.stations&&!/^(?:[0-9]{1,4}|10000|[Сс])$/.test(record.stations)?'Укажите число от 0 до 10000 или букву «С».':'');
+ fields.end.setCustomValidity(!record.open&&record.end&&record.start&&record.end<record.start?'Окончание должно быть не раньше начала.':'');
+ $('calculation').textContent='Длительность: '+clock(duration(record))+'  ·  Общий простой: '+clock(downtime(record));
+}
+function edit(record){
+ setNotice('');
+ editing=record?record.id:null;
+ form.reset();
+ dataFields.forEach(name=>{if(record) fields[name].value=record[name]||'';});
+ if(!record) fields.start.value=localDate(new Date());
+ fields.open.checked=record?record.open:true;
+ $('form-title').textContent=record?'Инцидент '+record.ticket:'Новый инцидент';
+ updateForm();
+ show('incident',true);
+}
+function back(){setNotice('');show('report',true);}
+$('report-tab').addEventListener('click',back);
+$('incident-tab').addEventListener('click',()=>{if($('incident').hidden) edit(null);});
+$('new').addEventListener('click',()=>edit(null));
+$('back').addEventListener('click',back);
+$('cancel').addEventListener('click',back);
+filters.addEventListener('change',render);
+filters.addEventListener('reset',()=>setTimeout(render,0));
+filters.addEventListener('submit',event=>event.preventDefault());
+form.addEventListener('input',updateForm);
+form.addEventListener('change',updateForm);
+form.addEventListener('submit',event=>{
+ event.preventDefault();
+ updateForm();
+ if(!form.reportValidity()) return;
+ const record=readForm();
+ record.id=editing||'incident-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+ const next=editing?incidents.map(row=>row.id===editing?record:row):incidents.concat(record);
+ try {localStorage.setItem(key,JSON.stringify(next));}
+ catch(error){setNotice('Браузер не смог сохранить данные. Проверьте доступ к локальному хранилищу.');return;}
+ incidents=next;
+ filters.reset();
+ show('report',true);
+ setNotice('Инцидент '+record.ticket+' сохранён.');
+});
+function csvCell(value) {
+ let safe=String(value==null?'':value);
+ if(/^[\s]*[=+@-]/.test(safe)) safe="'"+safe;
+ return '"'+safe.replace(/"/g,'""')+'"';
+}
+$('export').addEventListener('click',()=>{
+ const headings=['PW / NTT','Направление','ТЦ','Категория','Тип сети','Сетевой элемент','Количество БС','Тип оборудования','Тип аварии','Краткое описание','Начало','Окончание','АКБ','ГУ','Длительность','Прерывание связи','Общий простой','Кого уведомили','Подробное описание'];
+ const rows=currentRows().map(row=>[row.ticket,row.direction,row.center,row.category,row.network,row.element,row.stations,row.equipment,row.type,row.description,row.start,row.end||'НВ',row.battery,row.generator,clock(duration(row)),row.interruption,clock(downtime(row)),row.notified,row.details]);
+ const csv=[headings].concat(rows).map(row=>row.map(csvCell).join(';')).join('\r\n');
+ const url=URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}));
+ const link=document.createElement('a');
+ link.href=url;link.download='motiv-incidents.csv';
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+render();
+</script>
+</body>
+</html>
