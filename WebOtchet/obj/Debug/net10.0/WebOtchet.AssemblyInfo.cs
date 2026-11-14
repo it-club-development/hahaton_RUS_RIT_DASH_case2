@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WebOtchet")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+036021cd9375853efebf3684a4baf7e2096974d4")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+749f59933edadf5d8b99d0257c97eae4a4c2226e")]
 [assembly: System.Reflection.AssemblyProductAttribute("WebOtchet")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WebOtchet")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

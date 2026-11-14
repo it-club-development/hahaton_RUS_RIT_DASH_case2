@@ -9,6 +9,7 @@ using WebOtchet.Services;
 using WebOtchet.Infrastructure;
 using Doka.EntityFrameworkCore.MySql;
 using Microsoft.EntityFrameworkCore;
+using WebOtchet.Services.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,7 +95,8 @@ builder.Services.AddScoped<
     IPasswordHasher<User>,
     PasswordHasher<User>
 >();
-
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

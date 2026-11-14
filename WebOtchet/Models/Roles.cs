@@ -2,5 +2,5 @@ namespace WebOtchet.Models;
 
 public enum Roles : byte
 {
-    Admin,Engineer
+    Admin, Attendant, Engineer
 }

@@ -121,3 +121,4 @@
 /home/Tuberblyandia/Projects/ASP.NET/WebOtchet/WebOtchet/obj/Debug/net10.0/WebOtchet.pdb
 /home/Tuberblyandia/Projects/ASP.NET/WebOtchet/WebOtchet/obj/Debug/net10.0/WebOtchet.genruntimeconfig.cache
 /home/Tuberblyandia/Projects/ASP.NET/WebOtchet/WebOtchet/obj/Debug/net10.0/ref/WebOtchet.dll
+/home/Tuberblyandia/Projects/ASP.NET/WebOtchet/WebOtchet/obj/Debug/net10.0/WebOtchet.sourcelink.json

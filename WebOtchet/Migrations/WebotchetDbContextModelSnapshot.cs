@@ -66,6 +66,10 @@ namespace WebOtchet.Migrations
                         .HasColumnName("COMMON_PROSTOY")
                         .HasMySqlValueGenerationStrategy(MySqlValueGenerationStrategy.None);
 
+                    b.Property<string>("CreatedByUserId")
+                        .HasColumnType("char(36)")
+                        .HasMySqlValueGenerationStrategy(MySqlValueGenerationStrategy.None);
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(450)
@@ -151,6 +155,8 @@ namespace WebOtchet.Migrations
                     b.HasIndex("BeginTime")
                         .HasDatabaseName("IX_INCIDENTS_BEGIN_TIME");
 
+                    b.HasIndex("CreatedByUserId");
+
                     b.ToTable("INCIDENTS", (string)null);
                 });
 
@@ -187,6 +193,16 @@ namespace WebOtchet.Migrations
                         .HasDatabaseName("UX_USERS_USERNAME");
 
                     b.ToTable("USERS", (string)null);
+                });
+
+            modelBuilder.Entity("WebOtchet.Models.Incident", b =>
+                {
+                    b.HasOne("WebOtchet.Models.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedByUser");
                 });
 #pragma warning restore 612, 618
         }
