@@ -1,0 +1,6 @@
+@WebOtchet_HostAddress = http://localhost:5126
+
+GET {{WebOtchet_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
