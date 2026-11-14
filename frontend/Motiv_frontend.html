@@ -27,13 +27,16 @@ h1,h2{letter-spacing:-.015em}.field,th{letter-spacing:.01em}
 .report-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
 .report-chart{padding:18px}
 .report-chart h3{margin:0 0 8px}
-.downtime-day{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px}
+.report-period,.downtime-day{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px}
 #downtime-day-help{font-size:.875rem}
 .report-chart p{margin:0 0 12px}
 .chart-content{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
 .chart-content canvas{width:112px;height:112px}
 .chart-content ul{list-style:none;margin:0;padding:0;flex:1;min-width:150px}
 .chart-content li{margin:5px 0}
+.downtime-values{list-style:none;margin:0 0 12px;padding:0}
+.downtime-values li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #e1e8f2}
+.downtime-values strong{white-space:nowrap;font-variant-numeric:tabular-nums}
 .chart-key{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
 @media(max-width:780px){.report-charts{grid-template-columns:1fr}}
 </style>
@@ -77,17 +80,23 @@ h1,h2{letter-spacing:-.015em}.field,th{letter-spacing:.01em}
 <div class="report-charts">
  <section class="panel report-chart" aria-labelledby="status-chart-title">
   <h3 id="status-chart-title">Аварии по статусу</h3>
-  <p id="status-chart-summary"></p>
+  <label class="report-period" for="status-period">Период
+   <select id="status-period"><option value="">Не выбрано</option><option value="1">1 ч</option><option value="12">12 ч</option><option value="24">1 д</option><option value="168">7 д</option><option value="720">30 д</option></select>
+  </label>
+  <p id="status-chart-summary" aria-live="polite"></p>
   <div class="chart-content"><canvas id="status-chart" width="224" height="224" aria-hidden="true"></canvas><ul id="status-chart-legend"></ul></div>
  </section>
  <section class="panel report-chart" aria-labelledby="downtime-chart-title">
   <h3 id="downtime-chart-title">Суммарный простой БС по направлениям</h3>
+  <label class="report-period" for="downtime-period">Период
+   <select id="downtime-period"><option value="">Не выбрано</option><option value="1">1 ч</option><option value="12">12 ч</option><option value="24">1 д</option><option value="168">7 д</option><option value="720">30 д</option></select>
+  </label>
   <label class="downtime-day" for="downtime-day">Дата начала аварии
    <input type="date" id="downtime-day" aria-describedby="downtime-day-help">
   </label>
-  <p id="downtime-day-help">Без даты учитываются все записи в таблице.</p>
+  <p id="downtime-day-help">Период и дата фильтруют записи таблицы по времени начала аварии.</p>
   <p id="downtime-chart-summary" aria-live="polite"></p>
-  <div class="chart-content"><canvas id="downtime-chart" width="224" height="224" aria-hidden="true"></canvas><ul id="downtime-chart-legend"></ul></div>
+  <ul class="downtime-values" id="downtime-values" aria-label="Простой по направлениям"></ul>
   <p id="downtime-chart-note" hidden></p>
  </section>
 </div>
@@ -236,13 +245,22 @@ function drawPie(id, entries, total, format) {
   legend.appendChild(item);
  });
 }
-function renderCharts(rows) {
+function filterByPeriod(rows, hours, now = Date.now()) {
+ if (!hours) return rows;
+ const from = now - Number(hours) * 3600000;
+ return rows.filter(record => {
+  const start = new Date(record.start).getTime();
+  return start >= from && start <= now;
+ });
+}
+function renderStatusChart(rows) {
+ rows = filterByPeriod(rows, $('status-period').value);
  const open = rows.filter(record => record.open).length;
  $('status-chart-summary').textContent = rows.length ? 'Открытых аварий: ' + open : 'За выбранный период записей нет';
  drawPie('status-chart', [['Открытые', open], ['Закрытые', rows.length - open]], rows.length, String);
- renderDowntimeChart(rows);
 }
-function renderDowntimeChart(rows) {
+function renderDowntime(rows) {
+ rows = filterByPeriod(rows, $('downtime-period').value);
  const day = $('downtime-day').value;
  const matchingRows = day ? rows.filter(record => record.start.slice(0, 10) === day) : rows;
  const byDirection = new Map();
@@ -261,19 +279,29 @@ function renderDowntimeChart(rows) {
  const summary = $('downtime-chart-summary');
  if (byDirection.size) {
   summary.textContent = 'Всего (чч:мм:сс): ' + clock(total);
- } else if (day && !matchingRows.length) {
-  summary.textContent = 'По выбранным фильтрам за этот день аварий нет';
+ } else if (!matchingRows.length) {
+  summary.textContent = 'За выбранный период аварий нет';
  } else {
   summary.textContent = 'Нет данных для расчёта';
  }
  const note = $('downtime-chart-note');
  note.hidden = skipped === 0;
  note.textContent = 'Записей без расчётного простоя: ' + skipped;
- drawPie('downtime-chart', Array.from(byDirection).sort((a, b) => b[1] - a[1]), total, clock);
+ const list = $('downtime-values');
+ list.textContent = '';
+ Array.from(byDirection).sort((a, b) => b[1] - a[1]).forEach(([direction, seconds]) => {
+  const item = document.createElement('li');
+  item.appendChild(document.createTextNode(direction));
+  const value = document.createElement('strong');
+  value.textContent = clock(seconds);
+  item.appendChild(value);
+  list.appendChild(item);
+ });
 }
 function render() {
  const rows=currentRows();
- renderCharts(rows);
+ renderStatusChart(rows);
+ renderDowntime(rows);
  const tbody=$('rows');
  tbody.textContent='';
  rows.forEach(record=>{
@@ -329,7 +357,9 @@ $('new').addEventListener('click',()=>edit(null));
 $('back').addEventListener('click',back);
 $('cancel').addEventListener('click',back);
 filters.addEventListener('change',render);
-$('downtime-day').addEventListener('change', () => renderDowntimeChart(currentRows()));
+$('status-period').addEventListener('change', () => renderStatusChart(currentRows()));
+$('downtime-period').addEventListener('change', () => renderDowntime(currentRows()));
+$('downtime-day').addEventListener('change', () => renderDowntime(currentRows()));
 filters.addEventListener('reset',()=>setTimeout(render,0));
 filters.addEventListener('submit',event=>event.preventDefault());
 form.addEventListener('input',updateForm);
