@@ -1,8 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { canEdit, clock, dateLabel, downtime, duration, downloadCsv, filterByPeriod, lists } from '../../data';
-import type { Incident, User } from '../../data';
+import { clock, dateLabel, duration, lists } from '../../data';
+import { downloadReport, loadIncidentPage, loadReportSummary } from '../../api';
+import type { ReportSummary } from '../../api';
+import type { Incident } from '../../data';
 import './MainPage.css';
 
+function IncidentDuration({ incident }: { incident: Incident }) {
+  const [value, setValue] = useState(() => duration(incident));
+  useEffect(() => {
+    setValue(duration(incident));
+    if (!incident.open) return;
+    const timer = window.setInterval(() => setValue(duration(incident)), 1000);
+    return () => window.clearInterval(timer);
+  }, [incident]);
+  return <>{clock(value)}</>;
+}
+
+const pageSize = 20;
 const initialFilters = { from: '', to: '', direction: '', center: '', status: '' };
 const periods = [['', 'Не выбрано'], ['1', '1 ч'], ['12', '12 ч'], ['24', '1 д'], ['168', '7 д'], ['720', '30 д']];
 const colors = ['#215baa', '#b14d0c'];
@@ -15,12 +29,62 @@ function PeriodSelect({ value, onChange }: { value: string; onChange: (value: st
   </label>;
 }
 
-function StatusChart({ rows }: { rows: Incident[] }) {
+function dayAfter(day: string) {
+  if (day === '9999-12-31') return '9999-12-31T23:59:59.999999';
+  const date = new Date(day + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function reportTimestamp(milliseconds: number) {
+  const date = new Date(milliseconds);
+  return new Date(milliseconds - date.getTimezoneOffset() * 60000).toISOString().slice(0, 23);
+}
+
+type ReportProps = { query: string | null; revision: number; onError: (error: unknown) => void };
+
+function useSummary({ query, revision, onError }: ReportProps, period: string, day = '') {
+  const errorHandler = useRef(onError);
+  errorHandler.current = onError;
+  const [summary, setSummary] = useState<ReportSummary | null>(null);
+
+  useEffect(() => {
+    setSummary(null);
+    if (!query) return;
+    const params = new URLSearchParams(query);
+    let from = params.get('from')!;
+    let to = params.get('to')!;
+    if (day) {
+      from = from > day ? from : day;
+      const next = dayAfter(day);
+      to = to < next ? to : next;
+    }
+    if (period) {
+      const now = Date.now();
+      const start = reportTimestamp(now - Number(period) * 3600000);
+      const end = reportTimestamp(now);
+      from = from > start ? from : start;
+      to = to < end ? to : end;
+    }
+    if (from >= to) return;
+    params.set('from', from);
+    params.set('to', to);
+    const controller = new AbortController();
+    loadReportSummary(params.toString(), controller.signal)
+      .then(value => { if (!controller.signal.aborted) setSummary(value); })
+      .catch(error => { if (!controller.signal.aborted) errorHandler.current(error); });
+    return () => controller.abort();
+  }, [query, revision, period, day]);
+
+  return summary;
+}
+
+function StatusChart(props: ReportProps) {
   const [period, setPeriod] = useState('');
   const canvas = useRef<HTMLCanvasElement>(null);
-  const filtered = filterByPeriod(rows, period);
-  const total = filtered.length;
-  const open = filtered.filter(row => row.open).length;
+  const summary = useSummary(props, period);
+  const open = summary?.open ?? 0;
+  const total = open + (summary?.closed ?? 0);
 
   useEffect(() => {
     const context = canvas.current?.getContext('2d');
@@ -54,30 +118,19 @@ function StatusChart({ rows }: { rows: Incident[] }) {
   </section>;
 }
 
-function DowntimeSummary({ rows }: { rows: Incident[] }) {
+function DowntimeSummary(props: ReportProps) {
   const [period, setPeriod] = useState('');
   const [day, setDay] = useState('');
-  const selected = filterByPeriod(rows, period).filter(row => !day || row.start.slice(0, 10) === day);
-  const values = new Map<string, number>();
-  let skipped = 0;
-  let total = 0;
-  for (const row of selected) {
-    const seconds = downtime(row);
-    if (seconds === null || !Number.isFinite(seconds)) {
-      skipped++;
-      continue;
-    }
-    const direction = row.direction || 'Без направления';
-    values.set(direction, (values.get(direction) || 0) + seconds);
-    total += seconds;
-  }
-  const sorted = Array.from(values).sort((a, b) => b[1] - a[1]);
+  const summary = useSummary(props, period, day);
+  const skipped = summary?.skipped ?? 0;
+  const sorted = Object.entries(summary?.downtimeByDirection ?? {}).sort((a, b) => b[1] - a[1]);
+  const total = sorted.reduce((sum, [, seconds]) => sum + seconds, 0);
   return <section className="panel report-chart">
     <h3>Суммарный простой БС по направлениям</h3>
     <PeriodSelect value={period} onChange={setPeriod} />
     <label className="downtime-day">Дата начала аварии<input type="date" value={day} onChange={event => setDay(event.target.value)} aria-describedby="downtime-day-help" /></label>
     <p id="downtime-day-help">Период и дата фильтруют записи таблицы по времени начала аварии.</p>
-    <p aria-live="polite">{sorted.length ? 'Всего (чч:мм:сс): ' + clock(total) : selected.length ? 'Нет данных для расчёта' : 'За выбранный период аварий нет'}</p>
+    <p aria-live="polite">{sorted.length ? 'Всего (чч:мм:сс): ' + clock(total) : skipped ? 'Нет данных для расчёта' : 'За выбранный период аварий нет'}</p>
     <ul className="downtime-values" aria-label="Простой по направлениям">
       {sorted.map(([direction, seconds]) => <li key={direction}>{direction}<strong>{clock(seconds)}</strong></li>)}
     </ul>
@@ -85,26 +138,82 @@ function DowntimeSummary({ rows }: { rows: Incident[] }) {
   </section>;
 }
 
-type Props = { incidents: Incident[]; user: User; onEdit: (incident: Incident | null) => void };
-export default function MainPage({ incidents, user, onEdit }: Props) {
+type Props = Omit<ReportProps, 'query'> & { canCreate: boolean; canManage: (incident: Incident) => boolean; onEdit: (incident: Incident | null) => void; onClose?: (incident: Incident) => void; onDelete: (incident: Incident) => void; deleting: boolean };
+export default function MainPage({ revision, onError, canCreate, canManage, onEdit, onClose, onDelete, deleting }: Props) {
   const [filters, setFilters] = useState(initialFilters);
+  const [sort, setSort] = useState<'desc' | 'asc'>('desc');
+  const [page, setPage] = useState(1);
+  const [mergedBoundaries, setMergedBoundaries] = useState<number[]>([]);
+  const [result, setResult] = useState<{ query: string; key: string; rows: Incident[]; total: number }>();
+  const errorHandler = useRef(onError);
+  errorHandler.current = onError;
+
+  function resetPagination() {
+    setPage(1);
+    setMergedBoundaries([]);
+  }
+
   function setFilter(key: keyof typeof initialFilters, value: string) {
     setFilters(previous => ({ ...previous, [key]: value }));
+    resetPagination();
   }
-  const rows = incidents.filter(row => {
-    const day = row.start.slice(0, 10);
-    return (!filters.from || day >= filters.from) && (!filters.to || day <= filters.to) &&
-      (!filters.direction || row.direction === filters.direction) &&
-      (!filters.center || row.center === filters.center) &&
-      (!filters.status || (filters.status === 'open') === row.open);
-  }).sort((a, b) => b.start.localeCompare(a.start));
+  const params = new URLSearchParams({
+    from: filters.from || '1000-01-01',
+    to: dayAfter(filters.to || '9999-12-31'),
+    sort,
+  });
+  for (const field of ['direction', 'center', 'status'] as const) {
+    if (filters[field]) params.set(field, filters[field]);
+  }
+  const query = filters.from && filters.to && filters.from > filters.to ? null : params.toString();
+  const totalCount = result?.query === query ? result.total : 0;
+  // Each available boundary marks the first row of a separate page.
+  const pageStarts = [0];
+  for (let index = pageSize; index < totalCount; index += pageSize) {
+    if (!mergedBoundaries.includes(index)) pageStarts.push(index);
+  }
+  const totalPages = pageStarts.length;
+  const currentPage = Math.min(page, totalPages);
+  const offset = pageStarts[currentPage - 1];
+  const nextOffset = pageStarts[currentPage];
+  const hasMore = nextOffset !== undefined;
+  const firstBatch = offset / pageSize + 1;
+  // Each removed boundary expands the current logical page by one server page.
+  let lastBatch = firstBatch;
+  while (mergedBoundaries.includes(lastBatch * pageSize)) lastBatch++;
+  const requestKey = [query, revision, firstBatch, lastBatch].join('|');
+  const loaded = result?.key === requestKey;
+  const visibleRows = loaded ? result.rows : [];
+  const [failedRequest, setFailedRequest] = useState('');
+  const failed = failedRequest === requestKey;
+
+  useEffect(() => {
+    if (!query) return;
+    const controller = new AbortController();
+    setFailedRequest('');
+    const batches = Array.from({ length: lastBatch - firstBatch + 1 }, (_, index) =>
+      loadIncidentPage(query, firstBatch + index, pageSize, controller.signal));
+    Promise.all(batches).then(pages => {
+      if (controller.signal.aborted) return;
+      setResult({
+        query, key: requestKey, total: pages[0].totalCount,
+        rows: Array.from(new Map(([] as Incident[]).concat(...pages.map(value => value.items)).map(row => [row.id, row])).values()),
+      });
+    }).catch(error => {
+      if (!controller.signal.aborted) {
+        setFailedRequest(requestKey);
+        errorHandler.current(error);
+      }
+    });
+    return () => controller.abort();
+  }, [query, firstBatch, lastBatch, requestKey]);
 
   return <section>
     <div className="heading">
       <div><h1>Отчётность</h1><p className="subtitle">Журнал аварий сотовой сети</p></div>
       <div className="heading-actions">
-        <button className="btn" type="button" disabled={!rows.length} onClick={() => downloadCsv(rows)}>Скачать CSV</button>
-        {user !== 'engineer' && <button className="btn primary" type="button" onClick={() => onEdit(null)}>Новый инцидент</button>}
+        <button className="btn" type="button" disabled={!query || !totalCount} onClick={() => { if (query) void downloadReport(query).catch(onError); }}>Скачать CSV</button>
+        {canCreate && <button className="btn primary" type="button" onClick={() => onEdit(null)}>Новый инцидент</button>}
       </div>
     </div>
     <form className="filters panel" aria-label="Фильтры отчёта" onSubmit={event => event.preventDefault()}>
@@ -116,19 +225,49 @@ export default function MainPage({ incidents, user, onEdit }: Props) {
       <label className="field">Статус<select value={filters.status} onChange={event => setFilter('status', event.target.value)}>
         <option value="">Все</option><option value="open">Открыта</option><option value="closed">Закрыта</option>
       </select></label>
-      <button className="btn" type="button" onClick={() => setFilters(initialFilters)}>Сбросить</button>
+      <label className="field">Дата начала<select value={sort} onChange={event => {
+        setSort(event.target.value === 'asc' ? 'asc' : 'desc');
+        resetPagination();
+      }}>
+        <option value="desc">Сначала новые ↓</option>
+        <option value="asc">Сначала старые ↑</option>
+      </select></label>
+      <button className="btn" type="button" onClick={() => {
+        setFilters(initialFilters);
+        setSort('desc');
+        resetPagination();
+      }}>Сбросить</button>
     </form>
     <div className="panel">
       <div className="table-scroll"><table>
         <thead><tr>{['Начало', 'PW / NTT', 'Направление', 'ТЦ', 'Сетевой элемент', 'Длительность', 'Статус', 'Действие'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
-        <tbody>{rows.length ? rows.map(row => <tr key={row.id}>
-          <td>{dateLabel(row.start)}</td><td>{row.ticket}</td><td>{row.direction}</td><td>{row.center}</td><td>{row.element}</td><td>{clock(duration(row))}</td>
+        <tbody>{visibleRows.length ? visibleRows.map(row => <tr key={row.id}>
+          <td>{dateLabel(row.start)}</td><td>{row.ticket}</td><td>{row.direction}</td><td>{row.center}</td><td>{row.element}</td><td><IncidentDuration incident={row} /></td>
           <td><span className={row.open ? 'status open' : 'status'}>{row.open ? 'Открыта' : 'Закрыта'}</span></td>
-          <td>{canEdit(user) ? <button type="button" className="link" aria-label={'Открыть ' + row.ticket} onClick={() => onEdit(row)}>Открыть</button> : '—'}</td>
-        </tr>) : <tr><td colSpan={8} className="empty">За выбранный период аварий нет.</td></tr>}</tbody>
+          <td>{canManage(row) ? <button type="button" className="link" aria-label={'Открыть ' + row.ticket} onClick={() => onEdit(row)}>Открыть</button> : <button type="button" className="link" aria-label={'Просмотреть ' + row.ticket} onClick={() => onEdit(row)}>Просмотреть</button>}{onClose && row.open && <button type="button" className="link incident-close" aria-label={'Закрыть аварию ' + row.ticket} disabled={deleting} onClick={() => onClose(row)}>Закрыть аварию</button>}{canManage(row) && <button type="button" className="link incident-delete" aria-label={'Удалить ' + row.ticket} disabled={deleting} onClick={() => onDelete(row)}>Удалить</button>}</td>
+        </tr>) : <tr><td colSpan={8} className="empty">{!query ? 'Дата окончания раньше даты начала.' : failed ? 'Не удалось загрузить аварии.' : !loaded ? 'Загрузка…' : 'За выбранный период аварий нет.'}</td></tr>}</tbody>
       </table></div>
-      <div className="foot">Показано записей: {rows.length} из {incidents.length}</div>
+      <div className="foot report-pagination">
+        <span role="status">{visibleRows.length
+          ? 'Записи ' + (offset + 1) + '–' + (offset + visibleRows.length) + ' из ' + totalCount
+          : query && !loaded && !failed ? 'Загрузка…' : 'Нет записей'}</span>
+        {totalCount > pageSize && <div className="report-page-controls" role="group" aria-label="Страницы отчёта">
+          <button className="btn" type="button" disabled={!loaded || currentPage === 1} onClick={() => setPage(currentPage - 1)}>Предыдущая</button>
+          <label className="field report-page-select">Страница
+            <select disabled={!loaded} value={currentPage} onChange={event => setPage(Number(event.target.value))}>
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map(number =>
+                <option key={number} value={number}>{number} из {totalPages}</option>
+              )}
+            </select>
+          </label>
+          <button className="btn" type="button" disabled={!loaded || !hasMore} onClick={() => setPage(currentPage + 1)}>Следующая</button>
+          {hasMore && <button className="btn primary" type="button" disabled={!loaded} onClick={() => {
+            setPage(currentPage);
+            setMergedBoundaries(previous => [...previous, nextOffset]);
+          }}>Ещё</button>}
+        </div>}
+      </div>
     </div>
-    <div className="report-charts"><StatusChart rows={rows} /><DowntimeSummary rows={rows} /></div>
+    <div className="report-charts"><StatusChart query={query} revision={revision} onError={onError} /><DowntimeSummary query={query} revision={revision} onError={onError} /></div>
   </section>;
 }

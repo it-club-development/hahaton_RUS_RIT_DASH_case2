@@ -1,4 +1,8 @@
 using System.Text.Json.Serialization;
+using MySqlConnector;
+using Microsoft.AspNetCore.DataProtection;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using WebOtchet.Data;
@@ -12,6 +16,14 @@ using Microsoft.EntityFrameworkCore;
 using WebOtchet.Services.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
+var localHttp = builder.Environment.IsDevelopment() ||
+    builder.Configuration.GetValue<bool>("Hosting:LocalHttp");
+
+var keyPath = builder.Configuration["Hosting:DataProtectionPath"];
+if (!string.IsNullOrWhiteSpace(keyPath))
+    builder.Services.AddDataProtection()
+        .SetApplicationName("Motiv")
+        .PersistKeysToFileSystem(new DirectoryInfo(keyPath));
 
 
 builder.Services
@@ -31,10 +43,10 @@ var connectionString =
         "Строка подключения MariaDB не найдена."
     );
 var serverVersion =
-    MySqlServerVersion.MariaDb(new Version(12,3,3));
+    MySqlServerVersion.MariaDb(new Version(10, 1, 48), MySqlServerVersionCompatibilityMode.AllowUnsupported);
 
 builder.Services.AddDbContext<WebotchetDbContext>(options =>
-    options.UseMySql(connectionString, serverVersion)
+    options.UseMySql(new MySqlConnectionStringBuilder(connectionString) { ConvertZeroDateTime = true }.ConnectionString, serverVersion)
 );
 
 builder.Services
@@ -48,12 +60,30 @@ builder.Services
         options.Cookie.SameSite = SameSiteMode.Lax;
 
         options.Cookie.SecurePolicy =
-            builder.Environment.IsDevelopment()
+            localHttp
                 ? CookieSecurePolicy.SameAsRequest
                 : CookieSecurePolicy.Always;
 
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var principal = context.Principal;
+            var idValue = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            var users = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+            var user = Guid.TryParse(idValue, out var id)
+                ? await users.GetByIdWithHashAsync(id, context.HttpContext.RequestAborted)
+                : null;
+
+            if (user is null || principal?.FindFirstValue(ClaimTypes.Role) != user.Role.ToString() ||
+                principal.FindFirstValue(ClaimTypes.Name) != user.Username ||
+                principal.FindFirstValue(SessionStamp.ClaimType) != SessionStamp.FromHash(user.Hash))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
 
         options.Events.OnRedirectToLogin = context =>
         {
@@ -105,14 +135,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
-if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
+if (!localHttp) app.UseHttpsRedirection();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("Bootstrap:Initialize"))
+if (app.Configuration.GetValue<bool>("Bootstrap:Initialize"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var db = scope.ServiceProvider.GetRequiredService<WebotchetDbContext>();

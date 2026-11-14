@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.ComponentModel.DataAnnotations;
 using WebOtchet.Models;
+using WebOtchet.DTO.Incidents;
 using WebOtchet.Repositories.IRepository;
 using WebOtchet.Services.Helpers;
 
@@ -70,7 +71,8 @@ public sealed class IncidentService
         DateTime to,
         int page = 1,
         int pageSize = 50,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IncidentReportFilter? filter = null)
     {
         ValidatePeriod(from, to);
 
@@ -100,6 +102,7 @@ public sealed class IncidentService
         var totalCount = await _repository.CountByPeriodAsync(
             from,
             to,
+            filter,
             cancellationToken
         );
 
@@ -108,6 +111,7 @@ public sealed class IncidentService
             to,
             skip,
             pageSize,
+            filter,
             cancellationToken
         );
 
@@ -122,6 +126,30 @@ public sealed class IncidentService
         );
     }
 
+
+    public async Task<IncidentReportSummary> GetSummaryAsync(DateTime from, DateTime to,
+        IncidentReportFilter filter, CancellationToken cancellationToken)
+    {
+        ValidatePeriod(from, to);
+        int open = 0, closed = 0, skipped = 0;
+        var downtime = new Dictionary<string, long>();
+        await foreach (var row in _repository.GetReportValues(from, to, filter).WithCancellation(cancellationToken))
+        {
+            if (row.EndTime is null || row.EndTime == DateTime.MinValue)
+                open++;
+            else
+                closed++;
+
+            if (row.Downtime is not { } time)
+            {
+                skipped++;
+                continue;
+            }
+            var direction = string.IsNullOrEmpty(row.Direction) ? "Без направления" : row.Direction;
+            downtime[direction] = downtime.GetValueOrDefault(direction) + time.Ticks / TimeSpan.TicksPerSecond;
+        }
+        return new IncidentReportSummary(open, closed, skipped, downtime);
+    }
 
     public async Task<Incident> CreateAsync(
         Incident incident,
@@ -160,9 +188,12 @@ public sealed class IncidentService
             throw new ValidationException(
                 "Не указан идентификатор аварии."
             );
-        if (!CanManageIncident(currentUser,incident))
-        throw new UnauthorizedAccessException(
-            "Недостаточно прав для изменения записи.");
+        var existing = await _repository.GetByIdAsync(incident.Id, cancellationToken);
+        if (existing is null)
+            return false;
+
+        if (!CanManageIncident(currentUser, existing))
+            throw new UnauthorizedAccessException("Недостаточно прав для изменения записи.");
 
         ValidateAndNormalize(incident);
 
@@ -175,6 +206,27 @@ public sealed class IncidentService
     }
 
 
+    public async Task<int> CloseAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var incident = await _repository.GetByIdAsync(id, cancellationToken);
+        if (incident is null)
+            return 404;
+        if (incident.EndTime.HasValue)
+            return 204;
+
+        var now = DateTime.Now;
+        if (now < incident.BeginTime)
+            throw new ValidationException("Нельзя закрыть аварию раньше её начала.");
+
+        incident.EndTime = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerSecond);
+        RefreshLength(incident);
+        if (await _repository.CloseAsync(incident, cancellationToken))
+            return 204;
+
+        var current = await _repository.GetByIdAsync(id, cancellationToken);
+        return current is null ? 404 : current.EndTime.HasValue ? 204 : 409;
+    }
+
     public async Task<bool> DeleteAsync(
         Guid id,
         AuthenticatedUser currentUser,
@@ -184,10 +236,12 @@ public sealed class IncidentService
             throw new ValidationException(
                 "Некорректный ID аварии."
             );
-        var incident = await _repository.GetByIdAsync(id); 
-        if (!CanManageIncident(currentUser,incident))
-        throw new UnauthorizedAccessException(
-            "Недостаточно прав для удаления записи.");
+        var incident = await _repository.GetByIdAsync(id, cancellationToken);
+        if (incident is null)
+            return false;
+
+        if (!CanManageIncident(currentUser, incident))
+            throw new UnauthorizedAccessException("Недостаточно прав для удаления записи.");
         return await _repository.DeleteAsync(
             id,
             cancellationToken
@@ -398,33 +452,15 @@ public sealed class IncidentService
 
         var totalTime = TimeSpan.FromTicks(ticks);
 
-        if (totalTime > MaxDatabaseTime)
-        {
-            throw new ValidationException(
-                "Общее время простоя превышает диапазон MariaDB TIME. " +
-                "Рекомендуется хранить его в BIGINT (секундах)."
-            );
-        }
-
         incident.CommonStationTime = totalTime;
     }
 
     private static void RefreshLength(Incident incident)
     {
-        if(!incident.EndTime.HasValue)
-        {
-            incident.Length="00:00:00";
-            return;
-        }
-
-        var duration = incident.EndTime.Value - incident.BeginTime;
+        var duration = (incident.EndTime ?? DateTime.Now) - incident.BeginTime;
 
         if (duration < TimeSpan.Zero)
-        {
-            throw new ValidationException(
-                "Длительность аварии не может быть отрицательной."
-            );
-        }
+            duration = TimeSpan.Zero;
 
         long totalHours =
             duration.Ticks / TimeSpan.TicksPerHour;

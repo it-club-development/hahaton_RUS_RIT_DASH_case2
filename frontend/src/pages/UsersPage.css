@@ -1,0 +1,7 @@
+.users-page { display: grid; gap: 12px; max-width: 600px; }
+.users-form { display: grid; gap: 12px; padding: 20px; }
+.users-form button { justify-self: start; }
+.users-error { color: #a32837; }
+.profile-card button { margin: 4px 0; }
+nav button { overflow-wrap: anywhere; }
+

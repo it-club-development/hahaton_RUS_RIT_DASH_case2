@@ -89,6 +89,17 @@ if (currentUser is null)
         return updated ? NoContent() : NotFound();
     }
 
+    [HttpPost("{id:guid}/close")]
+    [Authorize(Roles = "Admin,Attendant")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Close(Guid id, CancellationToken cancellationToken)
+    {
+        var status = await _service.CloseAsync(id, cancellationToken);
+        return status == StatusCodes.Status409Conflict
+            ? Conflict(new ProblemDetails { Title = "Запись изменилась. Обновите отчёт и повторите попытку." })
+            : StatusCode(status);
+    }
+
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Admin,Attendant")] 
     [ValidateAntiForgeryToken]

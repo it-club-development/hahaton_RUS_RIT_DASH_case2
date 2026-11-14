@@ -15,8 +15,7 @@ namespace WebOtchet.Migrations
                 name: "CreatedByUserId",
                 table: "INCIDENTS",
                 type: "char(36)",
-                nullable: false)
-                .Annotation("Doka:MySql:RequiresExplicitBackfill", true)
+                nullable: true)
                 .Annotation("Doka:MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.None);
 
             migrationBuilder.CreateIndex(

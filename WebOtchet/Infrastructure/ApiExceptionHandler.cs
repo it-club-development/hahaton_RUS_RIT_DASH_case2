@@ -26,6 +26,16 @@ public sealed class ApiExceptionHandler : IExceptionHandler
 
         var (status, title, detail) = exception switch
         {
+            UnauthorizedAccessException => (
+                StatusCodes.Status403Forbidden,
+                "Доступ запрещён",
+                exception.Message
+            ),
+            UserHasIncidentsException => (
+                StatusCodes.Status409Conflict,
+                "Учётная запись связана с авариями",
+                exception.Message
+            ),
             ValidationException => (
                 StatusCodes.Status400BadRequest,
                 "Ошибка проверки данных",

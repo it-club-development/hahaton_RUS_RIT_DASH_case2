@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
+using WebOtchet.Infrastructure;
 using WebOtchet.Data;
 using WebOtchet.Models;
 using WebOtchet.Repositories.IRepository;
@@ -133,22 +135,17 @@ public async Task<User?> GetByIdWithHashAsync(
     public async Task<bool> UpdatePasswordHashAsync(
         Guid id,
         string hash,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? expectedHash = null)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken
-            );
-
-        if (user is null)
-            return false;
-
-        user.Hash = hash;
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return true;
+        var userId = id.ToString("D");
+        var updated = expectedHash is null
+            ? await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE USERS SET PASSWORD_HASH = {hash} WHERE ID = {userId}", cancellationToken)
+            : await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE USERS SET PASSWORD_HASH = {hash} WHERE ID = {userId} AND BINARY PASSWORD_HASH = BINARY {expectedHash}",
+                cancellationToken);
+        return updated == 1;
     }
 
     public async Task<bool> DeleteAsync(
@@ -166,7 +163,14 @@ public async Task<User?> GetByIdWithHashAsync(
 
         _context.Users.Remove(user);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is MySqlException { Number: 1451 })
+        {
+            throw new UserHasIncidentsException(exception);
+        }
 
         return true;
     }

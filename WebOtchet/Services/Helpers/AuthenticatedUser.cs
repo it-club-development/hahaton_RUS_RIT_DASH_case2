@@ -5,5 +5,6 @@ namespace WebOtchet.Services.Helpers;
 public sealed record AuthenticatedUser(
     Guid Id,
     string Username,
-    Roles Role
+    Roles Role,
+    string? PasswordStamp = null
 );
