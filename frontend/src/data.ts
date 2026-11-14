@@ -1,26 +1,12 @@
-export const accounts = {
-  admin: 'Администратор',
-  duty: 'Дежурный оператор',
-  engineer: 'Инженер',
-};
-export type User = keyof typeof accounts;
-export function isUser(value: unknown): value is User {
-  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(accounts, value);
-}
-
+export type User = 'admin' | 'engineer';
 export const fields = ['ticket','direction','center','category','network','type','element','stations','equipment','start','end','interruption','battery','generator','description','notified','details'] as const;
 export type Field = typeof fields[number];
 export type Incident = Partial<Record<Field, string>> & {
   id: string;
   start: string;
   open: boolean;
-  createdBy?: User;
 };
-export const storageKey = 'motiv-incidents-v1';
-export const sessionKey = 'motiv-demo-user';
-export function canEdit(user: User, incident: Incident) {
-  return user === 'admin' || (user === 'duty' && incident.createdBy === user);
-}
+export function canEdit(user: User) { return user === 'admin'; }
 
 export const lists = {
  direction:['ХМЯН','СВН','ЮЗН','Вся сеть'],
@@ -32,15 +18,6 @@ export const lists = {
 export function localDate(date: Date) {
  return new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
 }
-function sample(): Incident[]{
- const now=Date.now();
- return [
-  {id:'sample-1',ticket:'NTT-1042',direction:'СВН',center:'ЕКБ',category:'2',network:'LTE',type:'ЭЛ',element:'БС Екатеринбург-12',stations:'3',start:localDate(new Date(now-74*60000)),end:'',open:true,interruption:'00:18:00'},
-  {id:'sample-2',ticket:'PW-1038',direction:'ЮЗН',center:'КМУ',category:'1',network:'GSM',type:'РРС',element:'БС Каменск-04',stations:'1',start:localDate(new Date(now-208*60000)),end:localDate(new Date(now-173*60000)),open:false,interruption:'00:12:00'},
-  {id:'sample-3',ticket:'NTT-1031',direction:'ХМЯН',center:'НУРГ',category:'3',network:'LTE/GSM',type:'RBS',element:'БС Новый Уренгой-09',stations:'2',start:localDate(new Date(now-1600*60000)),end:localDate(new Date(now-1550*60000)),open:false,interruption:'00:05:00'}
- ];
-}
-
 export function duration(record: Pick<Incident, "start" | "end" | "open">) {
  if(!record.start || (!record.open && !record.end)) return null;
  const seconds=Math.floor(((record.open?Date.now():new Date(record.end || "").getTime())-new Date(record.start).getTime())/1000);
@@ -84,10 +61,3 @@ export function downloadCsv(records: Incident[]) {
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-export function loadIncidents(): Incident[] {
-  try {
-    const saved: unknown = JSON.parse(localStorage.getItem(storageKey) || "null");
-    if (Array.isArray(saved) && saved.every(row => row && typeof row.id === "string" && typeof row.start === "string" && typeof row.open === "boolean" && fields.every(field => row[field] === undefined || typeof row[field] === "string"))) return saved;
-  } catch { /* Fall back to demonstration data. */ }
-  return sample();
-}

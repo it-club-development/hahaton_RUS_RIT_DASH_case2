@@ -14,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 builder.Services
-    .AddControllers()
+    .AddControllersWithViews()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(
@@ -103,12 +103,29 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+if (app.Environment.IsDevelopment() && app.Configuration.GetValue<bool>("Bootstrap:Initialize"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var db = scope.ServiceProvider.GetRequiredService<WebotchetDbContext>();
+    await db.Database.MigrateAsync();
+    if (!await db.Set<User>().AnyAsync(user => user.Role == Roles.Admin))
+    {
+        var username = app.Configuration["Bootstrap:Username"] ?? "admin";
+        var password = app.Configuration["Bootstrap:Password"];
+        if (string.IsNullOrEmpty(password))
+            throw new InvalidOperationException("Set Bootstrap__Password to create the first administrator.");
+
+        var users = scope.ServiceProvider.GetRequiredService<UserService>();
+        await users.CreateAsync(username, password, Roles.Admin);
+    }
+}
 
 app.Run();
 

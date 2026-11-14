@@ -124,7 +124,7 @@ export default function MainPage({ incidents, user, onEdit }: Props) {
         <tbody>{rows.length ? rows.map(row => <tr key={row.id}>
           <td>{dateLabel(row.start)}</td><td>{row.ticket}</td><td>{row.direction}</td><td>{row.center}</td><td>{row.element}</td><td>{clock(duration(row))}</td>
           <td><span className={row.open ? 'status open' : 'status'}>{row.open ? 'Открыта' : 'Закрыта'}</span></td>
-          <td>{canEdit(user, row) ? <button type="button" className="link" aria-label={'Открыть ' + row.ticket} onClick={() => onEdit(row)}>Открыть</button> : '—'}</td>
+          <td>{canEdit(user) ? <button type="button" className="link" aria-label={'Открыть ' + row.ticket} onClick={() => onEdit(row)}>Открыть</button> : '—'}</td>
         </tr>) : <tr><td colSpan={8} className="empty">За выбранный период аварий нет.</td></tr>}</tbody>
       </table></div>
       <div className="foot">Показано записей: {rows.length} из {incidents.length}</div>

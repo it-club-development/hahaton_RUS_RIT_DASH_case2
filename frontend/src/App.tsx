@@ -1,87 +1,106 @@
-import { useState } from 'react';
-import { accounts, canEdit, isUser, loadIncidents, sessionKey, storageKey } from './data';
-import type { Incident, User } from './data';
+import { useEffect, useState } from 'react';
+import { ApiError, getProfile, loadIncidents, logout, saveIncident } from './api';
+import type { Profile } from './api';
+import type { Incident } from './data';
 import LoginPage from './pages/LoginPage/LoginPage';
 import MainPage from './pages/MainPage/MainPage';
 import IncidentPage from './pages/IncidentPage/IncidentPage';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(() => {
-    try {
-      const saved = sessionStorage.getItem(sessionKey);
-      return isUser(saved) ? saved : null;
-    } catch { return null; }
-  });
-  const [incidents, setIncidents] = useState(loadIncidents);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [rows, setRows] = useState<Incident[]>([]);
   const [draft, setDraft] = useState<Incident | null | undefined>(undefined);
   const [notice, setNotice] = useState('');
-  const [reportKey, resetReport] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [revision, reload] = useState(0);
+  const admin = profile?.role === 'Admin';
 
-  function changeUser(next: User | null) {
-    try {
-      if (next) sessionStorage.setItem(sessionKey, next);
-      else sessionStorage.removeItem(sessionKey);
-    } catch { /* The demo session can still run in memory. */ }
-    setUser(next);
+  function changeProfile(next: Profile | null) {
+    setProfile(next);
+    setRows([]);
     setDraft(undefined);
     setNotice('');
-    resetReport(key => key + 1);
   }
 
-  function openIncident(incident: Incident | null) {
-    if (!user || user === 'engineer' || (incident && !canEdit(user, incident))) return;
-    setNotice('');
-    setDraft(incident);
-    window.scrollTo(0, 0);
+  function reportError(error: unknown) {
+    if (error instanceof ApiError && error.status === 401) changeProfile(null);
+    setNotice(error instanceof Error ? error.message : 'Не удалось выполнить запрос.');
   }
 
-  function saveIncident(values: Omit<Incident, 'id'>) {
-    if (!user || user === 'engineer' || draft === undefined) return;
-    const existing = draft && incidents.find(row => row.id === draft.id);
-    if (draft && (!existing || !canEdit(user, existing))) return;
-    const record: Incident = {
-      ...values,
-      id: existing ? existing.id : 'incident-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
-      createdBy: existing ? existing.createdBy : user,
-    };
-    const next = existing ? incidents.map(row => row.id === existing.id ? record : row) : [...incidents, record];
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(next));
-    } catch {
-      setNotice('Браузер не смог сохранить данные.');
-      return;
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        setProfile(await getProfile());
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 401)) reportError(error);
+      } finally {
+        setChecking(false);
+      }
     }
-    setIncidents(next);
-    setDraft(undefined);
-    resetReport(key => key + 1);
-    setNotice('Инцидент ' + record.ticket + ' сохранён.');
+
+    void restoreSession();
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    let active = true;
+    loadIncidents().then(items => { if (active) setRows(items); })
+      .catch(error => { if (active) reportError(error); });
+    return () => { active = false; };
+  }, [profile, revision]);
+
+  function openIncident(value: Incident | null | undefined) {
+    setDraft(value);
+    setNotice('');
     window.scrollTo(0, 0);
   }
 
-  function showReport() {
-    setDraft(undefined);
+  async function submit(values: Omit<Incident, 'id'>) {
+    if (!admin || draft === undefined || saving) return;
+    setSaving(true);
     setNotice('');
-    window.scrollTo(0, 0);
+    try {
+      await saveIncident(values, draft?.id);
+      openIncident(undefined);
+      reload(current => current + 1);
+      setNotice('Инцидент ' + values.ticket + ' сохранён.');
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function signOut() {
+    try { await logout(); changeProfile(null); }
+    catch (error) { reportError(error); }
   }
 
   return <>
     <header>
       <div className="brand"><img className="brand-logo" src={import.meta.env.BASE_URL + 'motiv-logo.png'} alt="Веб-отчётность" /></div>
-      {user && <details className="profile" key={user}>
-        <summary className="btn">{accounts[user]}</summary>
-        <div className="panel profile-card"><strong>{accounts[user]}</strong><p>{user === 'duty' ? 'Дежурный' : accounts[user]}</p><button className="btn" type="button" onClick={() => changeUser(null)}>Выйти</button></div>
+      {profile && <details className="profile" key={profile.id}>
+        <summary className="btn">{profile.username}</summary>
+        <div className="panel profile-card">
+          <p>{admin ? 'Администратор' : 'Инженер'}</p>
+          <button className="btn" type="button" onClick={signOut} disabled={saving}>Выйти</button>
+        </div>
       </details>}
     </header>
-    {user ? <div className="shell">
+    {profile ? <div className="shell">
       <nav aria-label="Разделы">
-        <button type="button" aria-current={draft === undefined ? 'page' : undefined} onClick={showReport}><span aria-hidden="true">▤</span>Отчётность</button>
-        {user !== 'engineer' && <button type="button" aria-current={draft !== undefined ? 'page' : undefined} onClick={() => { if (draft === undefined) openIncident(null); }}><span aria-hidden="true">＋</span>Аварии</button>}
+        <button type="button" disabled={saving} aria-current={draft === undefined ? 'page' : undefined} onClick={() => openIncident(undefined)}>Отчётность</button>
+        {admin && <button type="button" disabled={saving} aria-current={draft !== undefined ? 'page' : undefined} onClick={() => { if (draft === undefined) openIncident(null); }}>Аварии</button>}
       </nav>
       <main>
         {notice && <p className="notice" role="status">{notice}</p>}
-        <div hidden={draft !== undefined}><MainPage key={reportKey} incidents={incidents} user={user} onEdit={openIncident} /></div>
-        {draft !== undefined && <IncidentPage key={draft ? draft.id : 'new'} incident={draft} onSave={saveIncident} onBack={showReport} />}
+        <div hidden={draft !== undefined}><MainPage key={revision} incidents={rows} user={admin ? 'admin' : 'engineer'} onEdit={openIncident} /></div>
+        {admin && draft !== undefined && <IncidentPage key={draft ? draft.id : 'new'} incident={draft} onSave={submit} saving={saving} onBack={() => openIncident(undefined)} />}
       </main>
-    </div> : <LoginPage onLogin={changeUser} />}
+    </div> : checking ? <p role="status">Проверяем сессию…</p> : <>
+      {notice && <p className="notice" role="status">{notice}</p>}
+      <LoginPage onLogin={changeProfile} />
+    </>}
   </>;
 }

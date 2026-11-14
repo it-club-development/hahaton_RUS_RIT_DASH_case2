@@ -59,6 +59,7 @@ public sealed class IncidentRepository : IIncidentRepository
         return await GetPeriodQuery(from, to)
             .OrderByDescending(x => x.BeginTime)
             .ThenBy(x => x.Id)
+            .ThenBy(x => x.Id)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);

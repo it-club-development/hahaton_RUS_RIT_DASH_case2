@@ -1,2 +1,5 @@
 import { defineConfig } from 'vite';
-export default defineConfig({ build: { target: 'chrome75' } });
+export default defineConfig({
+  server: { proxy: { '/api': 'http://localhost:5126' } },
+  build: { target: 'chrome75', cssTarget: 'chrome75' },
+});
