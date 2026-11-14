@@ -130,17 +130,16 @@ return new UserListItem(
                 password
             );
 
-            await _repository.UpdatePasswordHashAsync(
-                user.Id,
-                newHash,
-                cancellationToken
-            );
+            if (!await _repository.UpdatePasswordHashAsync(user.Id, newHash, cancellationToken, user.Hash))
+                return null;
+            user.Hash = newHash;
         }
 
         return new AuthenticatedUser(
             user.Id,
             user.Username,
-            user.Role
+            user.Role,
+            SessionStamp.FromHash(user.Hash)
         );
     }
 
@@ -247,7 +246,8 @@ var user = await _repository.GetByIdWithHashAsync(
         return await _repository.UpdatePasswordHashAsync(
             id,
             newHash,
-            cancellationToken
+            cancellationToken,
+            user.Hash
         );
     }
 

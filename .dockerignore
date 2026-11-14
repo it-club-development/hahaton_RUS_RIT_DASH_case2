@@ -1,0 +1,16 @@
+**
+!frontend/
+!frontend/**
+!WebOtchet/
+!WebOtchet/**
+**/.env
+**/.env.*
+**/.npmrc
+**/node_modules
+**/dist
+**/bin
+**/obj
+**/.git
+**/.vs
+**/wwwroot
+**/appsettings.Local.json

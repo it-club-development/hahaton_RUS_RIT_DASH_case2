@@ -135,22 +135,17 @@ public async Task<User?> GetByIdWithHashAsync(
     public async Task<bool> UpdatePasswordHashAsync(
         Guid id,
         string hash,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? expectedHash = null)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken
-            );
-
-        if (user is null)
-            return false;
-
-        user.Hash = hash;
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return true;
+        var userId = id.ToString("D");
+        var updated = expectedHash is null
+            ? await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE USERS SET PASSWORD_HASH = {hash} WHERE ID = {userId}", cancellationToken)
+            : await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE USERS SET PASSWORD_HASH = {hash} WHERE ID = {userId} AND BINARY PASSWORD_HASH = BINARY {expectedHash}",
+                cancellationToken);
+        return updated == 1;
     }
 
     public async Task<bool> DeleteAsync(

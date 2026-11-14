@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebOtchet.DTO.Users;
 using WebOtchet.Services;
+using WebOtchet.Services.Helpers;
 
 namespace WebOtchet.Controllers.Api;
 
@@ -58,7 +59,8 @@ public sealed class AccountController : ControllerBase
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
-            new(ClaimTypes.Role, user.Role.ToString())
+            new(ClaimTypes.Role, user.Role.ToString()),
+            new(SessionStamp.ClaimType, user.PasswordStamp!)
         };
 
         var identity = new ClaimsIdentity(

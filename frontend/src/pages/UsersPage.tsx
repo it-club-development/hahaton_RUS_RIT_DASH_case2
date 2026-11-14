@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { changePassword, createUser, listUsers, resetPassword } from '../api';
+import { changePassword, createUser, listUsers, resetPassword, roleLabels } from '../api';
 import type { Profile } from '../api';
 import './UsersPage.css';
 
@@ -18,6 +18,10 @@ export default function UsersPage({ profile, mode, onChanged, onExpired }: Props
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [selected, setSelected] = useState('');
+  const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim().toLocaleLowerCase('ru');
+  const matchingUsers = users.filter(user => user.id !== profile.id &&
+    (user.username + ' ' + roleLabels[user.role]).toLocaleLowerCase('ru').includes(normalizedQuery));
 
   useEffect(() => {
     if (mode !== 'users') return;
@@ -102,11 +106,18 @@ export default function UsersPage({ profile, mode, onChanged, onExpired }: Props
       </form>
       <form className="panel users-form" onSubmit={event => void submit(event, 'reset')}>
         <h2>Сброс пароля пользователя</h2>
-        <label className="field">Учётная запись<select required value={selected} disabled={loading} onChange={event => setSelected(event.target.value)}>
+        <label className="field">Поиск по логину или роли
+          <input type="search" value={query} disabled={pending || loading} onChange={event => {
+            setQuery(event.target.value);
+            setSelected('');
+          }} />
+        </label>
+        <label className="field">Учётная запись<select required value={selected} disabled={loading || pending} onChange={event => setSelected(event.target.value)}>
           <option value="">{loading ? 'Загрузка…' : 'Выбери пользователя'}</option>
-          {users.filter(user => user.id !== profile.id).map(user => <option key={user.id} value={user.id}>{user.username}</option>)}
+          {matchingUsers.map(user => <option key={user.id} value={user.id}>{user.username} ({roleLabels[user.role]})</option>)}
         </select></label>
         {passwordFields}
+        {!loading && !!normalizedQuery && matchingUsers.length === 0 && <p role="status">Пользователи не найдены.</p>}
         <button className="btn" disabled={pending || !selected}>Установить новый пароль</button>
       </form>
     </>}

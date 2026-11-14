@@ -45,7 +45,8 @@ public interface IUserRepository
     Task<bool> UpdatePasswordHashAsync(
         Guid id,
         string hash,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken = default,
+        string? expectedHash = null
     );
 
     Task<bool> DeleteAsync(

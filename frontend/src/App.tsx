@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ApiError, getProfile, loadIncidents, logout, saveIncident, deleteIncident } from './api';
+import { ApiError, getProfile, logout, saveIncident, deleteIncident, closeIncident, roleLabels } from './api';
 import type { Profile } from './api';
 import type { Incident } from './data';
 import LoginPage from './pages/LoginPage/LoginPage';
@@ -11,7 +11,7 @@ import IncidentPage from './pages/IncidentPage/IncidentPage';
 export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [checking, setChecking] = useState(true);
-  const [rows, setRows] = useState<Incident[]>([]);
+
   const [draft, setDraft] = useState<Incident | null | undefined>(undefined);
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
@@ -28,7 +28,7 @@ export default function App() {
   function changeProfile(next: Profile | null) {
     setSettings(null);
     setProfile(next);
-    setRows([]);
+
     setDraft(undefined);
     setNotice('');
   }
@@ -52,13 +52,7 @@ export default function App() {
     void restoreSession();
   }, []);
 
-  useEffect(() => {
-    if (!profile) return;
-    let active = true;
-    loadIncidents().then(items => { if (active) setRows(items); })
-      .catch(error => { if (active) reportError(error); });
-    return () => { active = false; };
-  }, [profile, revision]);
+
 
   function openIncident(value: Incident | null | undefined) {
     setSettings(null);
@@ -83,6 +77,22 @@ export default function App() {
     }
   }
 
+  async function closeFromReport(incident: Incident) {
+    if (!canCreate || !incident.open || saving) return;
+    if (!window.confirm('Закрыть аварию «' + (incident.ticket || incident.id) + '» текущим временем?')) return;
+    setSaving(true);
+    setNotice('');
+    try {
+      await closeIncident(incident.id);
+      reload(current => current + 1);
+      setNotice('Авария закрыта.');
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function removeIncident(incident: Incident) {
     if (!canManage(incident) || saving) return;
     if (!window.confirm('Удалить аварию «' + (incident.ticket || incident.id) + '»? Действие нельзя отменить.')) return;
@@ -91,7 +101,7 @@ export default function App() {
     setNotice('');
     try {
       await deleteIncident(incident.id);
-      setRows(current => current.filter(row => row.id !== incident.id));
+      reload(current => current + 1);
       setNotice('Авария удалена.');
     } catch (error) {
       reportError(error);
@@ -111,7 +121,7 @@ export default function App() {
       {profile && <details className="profile" key={profile.id}>
         <summary className="btn">{profile.username}</summary>
         <div className="panel profile-card">
-          <p>{admin ? 'Администратор' : profile.role === 'Attendant' ? 'Дежурный' : 'Инженер'}</p>
+          <p>{roleLabels[profile.role]}</p>
           <button className="btn" type="button" onClick={() => { setNotice(""); setSettings("password"); }} disabled={saving}>Сменить пароль</button>
           <button className="btn" type="button" onClick={signOut} disabled={saving}>Выйти</button>
         </div>
@@ -126,9 +136,9 @@ export default function App() {
       </nav>
       <main>
         {notice && <p className="notice" role="status">{notice}</p>}
-        <div hidden={Boolean(settings) || draft !== undefined}><MainPage key={revision} incidents={rows} canCreate={canCreate} canManage={canManage} onEdit={openIncident} onDelete={removeIncident} deleting={saving} /></div>
+        <div hidden={Boolean(settings) || draft !== undefined}><MainPage revision={revision} onError={reportError} canCreate={canCreate} canManage={canManage} onEdit={openIncident} onClose={canCreate ? closeFromReport : undefined} onDelete={removeIncident} deleting={saving} /></div>
         {settings && <UsersPage key={settings} profile={profile} mode={settings} onExpired={() => { changeProfile(null); setNotice("Сессия завершилась. Войди снова."); }} onChanged={() => { changeProfile(null); setNotice("Пароль изменён. Войди с новым паролем."); }} />}
-        <div hidden={Boolean(settings)}>{canCreate && draft !== undefined && <IncidentPage key={draft ? draft.id : 'new'} incident={draft} onSave={submit} saving={saving} onBack={() => openIncident(undefined)} />}</div>
+        <div hidden={Boolean(settings)}>{draft !== undefined && <IncidentPage key={draft ? draft.id : 'new'} incident={draft} readOnly={Boolean(draft && !canManage(draft))} showStatusActions={profile.role === 'Attendant'} onSave={submit} saving={saving} onBack={() => openIncident(undefined)} />}</div>
       </main>
     </div> : checking ? <p role="status">Проверяем сессию…</p> : <>
       {notice && <p className="notice" role="status">{notice}</p>}
