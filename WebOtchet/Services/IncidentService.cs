@@ -160,9 +160,12 @@ public sealed class IncidentService
             throw new ValidationException(
                 "Не указан идентификатор аварии."
             );
-        if (!CanManageIncident(currentUser,incident))
-        throw new UnauthorizedAccessException(
-            "Недостаточно прав для изменения записи.");
+        var existing = await _repository.GetByIdAsync(incident.Id, cancellationToken);
+        if (existing is null)
+            return false;
+
+        if (!CanManageIncident(currentUser, existing))
+            throw new UnauthorizedAccessException("Недостаточно прав для изменения записи.");
 
         ValidateAndNormalize(incident);
 
@@ -184,10 +187,12 @@ public sealed class IncidentService
             throw new ValidationException(
                 "Некорректный ID аварии."
             );
-        var incident = await _repository.GetByIdAsync(id); 
-        if (!CanManageIncident(currentUser,incident))
-        throw new UnauthorizedAccessException(
-            "Недостаточно прав для удаления записи.");
+        var incident = await _repository.GetByIdAsync(id, cancellationToken);
+        if (incident is null)
+            return false;
+
+        if (!CanManageIncident(currentUser, incident))
+            throw new UnauthorizedAccessException("Недостаточно прав для удаления записи.");
         return await _repository.DeleteAsync(
             id,
             cancellationToken

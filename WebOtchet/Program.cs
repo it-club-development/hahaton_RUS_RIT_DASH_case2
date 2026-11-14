@@ -1,4 +1,6 @@
 using System.Text.Json.Serialization;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using WebOtchet.Data;
@@ -54,6 +56,23 @@ builder.Services
 
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
+
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var principal = context.Principal;
+            var idValue = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            var users = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+            var user = Guid.TryParse(idValue, out var id)
+                ? await users.GetByIdAsync(id, context.HttpContext.RequestAborted)
+                : null;
+
+            if (user is null || principal?.FindFirstValue(ClaimTypes.Role) != user.Role.ToString() ||
+                principal.FindFirstValue(ClaimTypes.Name) != user.Username)
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
 
         options.Events.OnRedirectToLogin = context =>
         {

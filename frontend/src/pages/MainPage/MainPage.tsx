@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { canEdit, clock, dateLabel, downtime, duration, downloadCsv, filterByPeriod, lists } from '../../data';
-import type { Incident, User } from '../../data';
+import { clock, dateLabel, downtime, duration, downloadCsv, filterByPeriod, lists } from '../../data';
+import type { Incident } from '../../data';
 import './MainPage.css';
 
 const initialFilters = { from: '', to: '', direction: '', center: '', status: '' };
@@ -85,8 +85,8 @@ function DowntimeSummary({ rows }: { rows: Incident[] }) {
   </section>;
 }
 
-type Props = { incidents: Incident[]; user: User; onEdit: (incident: Incident | null) => void };
-export default function MainPage({ incidents, user, onEdit }: Props) {
+type Props = { incidents: Incident[]; canCreate: boolean; canManage: (incident: Incident) => boolean; onEdit: (incident: Incident | null) => void; onDelete: (incident: Incident) => void; deleting: boolean };
+export default function MainPage({ incidents, canCreate, canManage, onEdit, onDelete, deleting }: Props) {
   const [filters, setFilters] = useState(initialFilters);
   function setFilter(key: keyof typeof initialFilters, value: string) {
     setFilters(previous => ({ ...previous, [key]: value }));
@@ -104,7 +104,7 @@ export default function MainPage({ incidents, user, onEdit }: Props) {
       <div><h1>Отчётность</h1><p className="subtitle">Журнал аварий сотовой сети</p></div>
       <div className="heading-actions">
         <button className="btn" type="button" disabled={!rows.length} onClick={() => downloadCsv(rows)}>Скачать CSV</button>
-        {user !== 'engineer' && <button className="btn primary" type="button" onClick={() => onEdit(null)}>Новый инцидент</button>}
+        {canCreate && <button className="btn primary" type="button" onClick={() => onEdit(null)}>Новый инцидент</button>}
       </div>
     </div>
     <form className="filters panel" aria-label="Фильтры отчёта" onSubmit={event => event.preventDefault()}>
@@ -124,7 +124,7 @@ export default function MainPage({ incidents, user, onEdit }: Props) {
         <tbody>{rows.length ? rows.map(row => <tr key={row.id}>
           <td>{dateLabel(row.start)}</td><td>{row.ticket}</td><td>{row.direction}</td><td>{row.center}</td><td>{row.element}</td><td>{clock(duration(row))}</td>
           <td><span className={row.open ? 'status open' : 'status'}>{row.open ? 'Открыта' : 'Закрыта'}</span></td>
-          <td>{canEdit(user) ? <button type="button" className="link" aria-label={'Открыть ' + row.ticket} onClick={() => onEdit(row)}>Открыть</button> : '—'}</td>
+          <td>{canManage(row) ? <button type="button" className="link" aria-label={'Открыть ' + row.ticket} onClick={() => onEdit(row)}>Открыть</button> : '—'}{canManage(row) && <button type="button" className="link incident-delete" aria-label={'Удалить ' + row.ticket} disabled={deleting} onClick={() => onDelete(row)}>Удалить</button>}</td>
         </tr>) : <tr><td colSpan={8} className="empty">За выбранный период аварий нет.</td></tr>}</tbody>
       </table></div>
       <div className="foot">Показано записей: {rows.length} из {incidents.length}</div>

@@ -279,6 +279,21 @@ var user = await _repository.GetByIdWithHashAsync(
     }
 
 
+    public async Task<bool> ResetPasswordAsync(
+        Guid id,
+        string newPassword,
+        CancellationToken cancellationToken)
+    {
+        ValidateId(id);
+        ValidatePassword(newPassword);
+        var user = await _repository.GetByIdWithHashAsync(id, cancellationToken);
+        if (user is null)
+            return false;
+
+        var hash = _passwordHasher.HashPassword(user, newPassword);
+        return await _repository.UpdatePasswordHashAsync(id, hash, cancellationToken);
+    }
+
     private static string ValidateUsername(string username)
     {
         username = (username ?? "").Trim();

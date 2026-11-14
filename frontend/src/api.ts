@@ -1,8 +1,8 @@
 import type { Incident } from './data';
 
-export type Profile = { id: string; username: string; role: 'Admin' | 'Engineer' };
+export type Profile = { id: string; username: string; role: 'Admin' | 'Engineer' | 'Attendant' };
 type ServerIncident = {
-  id: string; pw: string; direction: string; techCenter: string; category: number;
+  id: string; createdByUserId: string | null; pw: string; direction: string; techCenter: string; category: number;
   networkType: string; serviceElement: string; numberOfBaseStations: string;
   equipmentType: string; alarmType: string; description: string; beginTime: string;
   endTime: string | null; akb: string | null; generatorTime: string | null;
@@ -68,7 +68,7 @@ export async function loadIncidents(): Promise<Incident[]> {
     const response = await request('reports/incidents?from=1000-01-01&to=9999-12-31&pageSize=200&page=' + page);
     const batch = await response.json() as { items: ServerIncident[]; totalPages: number };
     for (const row of batch.items) records.set(row.id, {
-      id: row.id, ticket: row.pw, direction: row.direction, center: row.techCenter,
+      id: row.id, createdByUserId: row.createdByUserId, ticket: row.pw, direction: row.direction, center: row.techCenter,
       category: String(row.category), network: row.networkType, element: row.serviceElement,
       stations: row.numberOfBaseStations, equipment: row.equipmentType, type: row.alarmType,
       description: row.description, start: row.beginTime, end: row.endTime || '', open: row.endTime === null,
@@ -88,4 +88,24 @@ export async function saveIncident(values: Omit<Incident, 'id'>, id?: string) {
     akb: toTimeSpan(values.battery), generatorTime: toTimeSpan(values.generator),
     baseStationTime: toTimeSpan(values.interruption), alarmWho: values.notified || '', noticeDescription: values.details || '',
   });
+}
+
+export async function listUsers(): Promise<Profile[]> {
+  return (await request('users')).json();
+}
+
+export async function createUser(username: string, password: string, role: Profile['role']): Promise<Profile> {
+  return (await write('users', 'POST', { username, password, role })).json();
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  await write('account/change-password', 'POST', { currentPassword, newPassword });
+}
+
+export async function resetPassword(id: string, newPassword: string) {
+  await write('users/' + encodeURIComponent(id) + '/reset-password', 'POST', { newPassword });
+}
+
+export async function deleteIncident(id: string) {
+  await write('incidents/' + encodeURIComponent(id), 'DELETE');
 }

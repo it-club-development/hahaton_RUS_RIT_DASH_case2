@@ -1,12 +1,11 @@
-export type User = 'admin' | 'engineer';
 export const fields = ['ticket','direction','center','category','network','type','element','stations','equipment','start','end','interruption','battery','generator','description','notified','details'] as const;
 export type Field = typeof fields[number];
 export type Incident = Partial<Record<Field, string>> & {
   id: string;
+  createdByUserId?: string | null;
   start: string;
   open: boolean;
 };
-export function canEdit(user: User) { return user === 'admin'; }
 
 export const lists = {
  direction:['ХМЯН','СВН','ЮЗН','Вся сеть'],

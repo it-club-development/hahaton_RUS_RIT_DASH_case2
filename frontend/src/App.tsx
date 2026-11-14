@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ApiError, getProfile, loadIncidents, logout, saveIncident } from './api';
+import { ApiError, getProfile, loadIncidents, logout, saveIncident, deleteIncident } from './api';
 import type { Profile } from './api';
 import type { Incident } from './data';
 import LoginPage from './pages/LoginPage/LoginPage';
 import MainPage from './pages/MainPage/MainPage';
+import ThemePicker from './ThemePicker';
+import UsersPage from './pages/UsersPage';
 import IncidentPage from './pages/IncidentPage/IncidentPage';
 
 export default function App() {
@@ -14,9 +16,17 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
   const [revision, reload] = useState(0);
+  const [settings, setSettings] = useState<'users' | 'password' | null>(null);
   const admin = profile?.role === 'Admin';
 
+  const canCreate = admin || profile?.role === 'Attendant';
+
+  function canManage(incident: Incident) {
+    return admin || (profile?.role === 'Attendant' && incident.createdByUserId === profile.id);
+  }
+
   function changeProfile(next: Profile | null) {
+    setSettings(null);
     setProfile(next);
     setRows([]);
     setDraft(undefined);
@@ -51,13 +61,14 @@ export default function App() {
   }, [profile, revision]);
 
   function openIncident(value: Incident | null | undefined) {
+    setSettings(null);
     setDraft(value);
     setNotice('');
     window.scrollTo(0, 0);
   }
 
   async function submit(values: Omit<Incident, 'id'>) {
-    if (!admin || draft === undefined || saving) return;
+    if (!canCreate || draft === undefined || saving || (draft && !canManage(draft))) return;
     setSaving(true);
     setNotice('');
     try {
@@ -65,6 +76,23 @@ export default function App() {
       openIncident(undefined);
       reload(current => current + 1);
       setNotice('Инцидент ' + values.ticket + ' сохранён.');
+    } catch (error) {
+      reportError(error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeIncident(incident: Incident) {
+    if (!canManage(incident) || saving) return;
+    if (!window.confirm('Удалить аварию «' + (incident.ticket || incident.id) + '»? Действие нельзя отменить.')) return;
+
+    setSaving(true);
+    setNotice('');
+    try {
+      await deleteIncident(incident.id);
+      setRows(current => current.filter(row => row.id !== incident.id));
+      setNotice('Авария удалена.');
     } catch (error) {
       reportError(error);
     } finally {
@@ -83,20 +111,24 @@ export default function App() {
       {profile && <details className="profile" key={profile.id}>
         <summary className="btn">{profile.username}</summary>
         <div className="panel profile-card">
-          <p>{admin ? 'Администратор' : 'Инженер'}</p>
+          <p>{admin ? 'Администратор' : profile.role === 'Attendant' ? 'Дежурный' : 'Инженер'}</p>
+          <button className="btn" type="button" onClick={() => { setNotice(""); setSettings("password"); }} disabled={saving}>Сменить пароль</button>
           <button className="btn" type="button" onClick={signOut} disabled={saving}>Выйти</button>
         </div>
       </details>}
     </header>
+    <ThemePicker />
     {profile ? <div className="shell">
       <nav aria-label="Разделы">
-        <button type="button" disabled={saving} aria-current={draft === undefined ? 'page' : undefined} onClick={() => openIncident(undefined)}>Отчётность</button>
-        {admin && <button type="button" disabled={saving} aria-current={draft !== undefined ? 'page' : undefined} onClick={() => { if (draft === undefined) openIncident(null); }}>Аварии</button>}
+        <button type="button" disabled={saving} aria-current={!settings && draft === undefined ? 'page' : undefined} onClick={() => openIncident(undefined)}>Отчётность</button>
+        {canCreate && <button type="button" disabled={saving} aria-current={!settings && draft !== undefined ? 'page' : undefined} onClick={() => { if (settings || draft === undefined) openIncident(null); }}>Аварии</button>}
+        {admin && <button type="button" disabled={saving} aria-current={settings === "users" ? "page" : undefined} onClick={() => { setNotice(""); setSettings("users"); }}>Пользователи</button>}
       </nav>
       <main>
         {notice && <p className="notice" role="status">{notice}</p>}
-        <div hidden={draft !== undefined}><MainPage key={revision} incidents={rows} user={admin ? 'admin' : 'engineer'} onEdit={openIncident} /></div>
-        {admin && draft !== undefined && <IncidentPage key={draft ? draft.id : 'new'} incident={draft} onSave={submit} saving={saving} onBack={() => openIncident(undefined)} />}
+        <div hidden={Boolean(settings) || draft !== undefined}><MainPage key={revision} incidents={rows} canCreate={canCreate} canManage={canManage} onEdit={openIncident} onDelete={removeIncident} deleting={saving} /></div>
+        {settings && <UsersPage key={settings} profile={profile} mode={settings} onExpired={() => { changeProfile(null); setNotice("Сессия завершилась. Войди снова."); }} onChanged={() => { changeProfile(null); setNotice("Пароль изменён. Войди с новым паролем."); }} />}
+        <div hidden={Boolean(settings)}>{canCreate && draft !== undefined && <IncidentPage key={draft ? draft.id : 'new'} incident={draft} onSave={submit} saving={saving} onBack={() => openIncident(undefined)} />}</div>
       </main>
     </div> : checking ? <p role="status">Проверяем сессию…</p> : <>
       {notice && <p className="notice" role="status">{notice}</p>}

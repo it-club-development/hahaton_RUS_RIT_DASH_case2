@@ -59,7 +59,6 @@ public sealed class IncidentRepository : IIncidentRepository
         return await GetPeriodQuery(from, to)
             .OrderByDescending(x => x.BeginTime)
             .ThenBy(x => x.Id)
-            .ThenBy(x => x.Id)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
@@ -106,6 +105,7 @@ public sealed class IncidentRepository : IIncidentRepository
         if (existing is null)
             return false;
 
+        incident.CreatedByUserId = existing.CreatedByUserId;
         _context.Entry(existing)
             .CurrentValues
             .SetValues(incident);

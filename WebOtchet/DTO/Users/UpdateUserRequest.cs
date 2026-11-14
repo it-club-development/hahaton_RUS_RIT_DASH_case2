@@ -8,5 +8,5 @@ public sealed class UpdateUserRequest
     [Required, StringLength(100, MinimumLength = 3)]
     public string Username { get; init; } = "";
 
-    public Roles Role { get; init; }
+    public required Roles Role { get; init; }
 }

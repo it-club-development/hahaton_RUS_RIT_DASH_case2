@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
+using WebOtchet.Infrastructure;
 using WebOtchet.Data;
 using WebOtchet.Models;
 using WebOtchet.Repositories.IRepository;
@@ -166,7 +168,14 @@ public async Task<User?> GetByIdWithHashAsync(
 
         _context.Users.Remove(user);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is MySqlException { Number: 1451 })
+        {
+            throw new UserHasIncidentsException(exception);
+        }
 
         return true;
     }
