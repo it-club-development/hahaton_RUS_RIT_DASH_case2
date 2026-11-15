@@ -29,8 +29,20 @@ function PeriodSelect({ value, onChange }: { value: string; onChange: (value: st
   </label>;
 }
 
+const minReportDate = '1000-01-01';
+const maxReportDate = '9999-12-31';
+const invalidReportDateMessage = 'Выберите существующую дату с годом от 1000 до 9999.';
+
+function isReportDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value < minReportDate || value > maxReportDate)
+    return false;
+
+  const date = new Date(value + 'T00:00:00Z');
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function dayAfter(day: string) {
-  if (day === '9999-12-31') return '9999-12-31T23:59:59.999999';
+  if (day === maxReportDate) return '9999-12-31T23:59:59.999999';
   const date = new Date(day + 'T00:00:00Z');
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10);
@@ -43,11 +55,12 @@ const emptySummary: ReportSummary = { open: 0, closed: 0, skipped: 0, downtimeBy
 function useSummary({ query, revision, onError }: ReportProps, period: string, day = '') {
   const errorHandler = useRef(onError);
   errorHandler.current = onError;
+  const invalidDay = day !== '' && !isReportDate(day);
   const key = JSON.stringify([query, revision, period, day]);
   const [result, setResult] = useState<{ key: string; summary?: ReportSummary }>();
 
   useEffect(() => {
-    if (!query) return;
+    if (!query || invalidDay) return;
     const params = new URLSearchParams(query);
     if (day) {
       const from = params.get('from')!;
@@ -86,8 +99,9 @@ function useSummary({ query, revision, onError }: ReportProps, period: string, d
       window.clearInterval(timer);
       controller?.abort();
     };
-  }, [key, query, period, day]);
+  }, [key, query, period, day, invalidDay]);
 
+  if (invalidDay) return { status: invalidReportDateMessage };
   if (!query) return { summary: emptySummary, status: '' };
   if (result?.key !== key) return { status: 'Загрузка сводки…' };
   return { summary: result.summary, status: result.summary ? '' : 'Не удалось загрузить сводку.' };
@@ -142,7 +156,7 @@ function DowntimeSummary(props: ReportProps) {
   return <section className="panel report-chart">
     <h3>Суммарный простой БС по направлениям</h3>
     <PeriodSelect value={period} onChange={setPeriod} />
-    <label className="downtime-day">Дата начала аварии<input type="date" value={day} onChange={event => setDay(event.target.value)} aria-describedby="downtime-day-help" /></label>
+    <label className="downtime-day">Дата начала аварии<input type="date" min={minReportDate} max={maxReportDate} aria-invalid={day !== "" && !isReportDate(day)} value={day} onChange={event => setDay(event.target.value)} aria-describedby="downtime-day-help" /></label>
     <p id="downtime-day-help">Период и дата уточняют сводку по времени начала аварии.</p>
     <p aria-live="polite">{status || (sorted.length ? 'Всего (чч:мм:сс): ' + clock(total) : skipped ? 'Нет данных для расчёта' : 'За выбранный период аварий нет')}</p>
     <ul className="downtime-values" aria-label="Простой по направлениям">
@@ -171,15 +185,21 @@ export default function MainPage({ revision, onError, canCreate, canManage, onEd
     setFilters(previous => ({ ...previous, [key]: value }));
     resetPagination();
   }
+  const from = filters.from || minReportDate;
+  const to = filters.to || maxReportDate;
+  const invalidFrom = !isReportDate(from);
+  const invalidTo = !isReportDate(to);
+  const dateError = invalidFrom || invalidTo ? invalidReportDateMessage
+    : from > to ? 'Дата окончания раньше даты начала.' : '';
   const params = new URLSearchParams({
-    from: filters.from || '1000-01-01',
-    to: dayAfter(filters.to || '9999-12-31'),
+    from,
+    to: dateError ? '' : dayAfter(to),
     sort,
   });
   for (const field of ['direction', 'center', 'status'] as const) {
     if (filters[field]) params.set(field, filters[field]);
   }
-  const query = filters.from && filters.to && filters.from > filters.to ? null : params.toString();
+  const query = dateError ? null : params.toString();
   const totalCount = result?.query === query ? result.total : 0;
   // Each available boundary marks the first row of a separate page.
   const pageStarts = [0];
@@ -231,8 +251,8 @@ export default function MainPage({ revision, onError, canCreate, canManage, onEd
       </div>
     </div>
     <form className="filters panel" aria-label="Фильтры отчёта" onSubmit={event => event.preventDefault()}>
-      <label className="field">Начало периода<input type="date" value={filters.from} onChange={event => setFilter('from', event.target.value)} /></label>
-      <label className="field">Конец периода<input type="date" value={filters.to} onChange={event => setFilter('to', event.target.value)} /></label>
+      <label className="field">Начало периода<input type="date" min={minReportDate} max={maxReportDate} aria-invalid={invalidFrom} value={filters.from} onChange={event => setFilter('from', event.target.value)} /></label>
+      <label className="field">Конец периода<input type="date" min={minReportDate} max={maxReportDate} aria-invalid={invalidTo} value={filters.to} onChange={event => setFilter('to', event.target.value)} /></label>
       {(['direction', 'center'] as const).map(key => <label className="field" key={key}>{key === 'direction' ? 'Направление' : 'Технический центр'}
         <select value={filters[key]} onChange={event => setFilter(key, event.target.value)}><option value="">Все</option>{lists[key].map(item => <option key={item}>{item}</option>)}</select>
       </label>)}
@@ -259,7 +279,7 @@ export default function MainPage({ revision, onError, canCreate, canManage, onEd
           <td>{dateLabel(row.start)}</td><td>{row.ticket}</td><td>{row.direction}</td><td>{row.center}</td><td>{row.element}</td><td><IncidentDuration incident={row} /></td>
           <td><span className={row.open ? 'status open' : 'status'}>{row.open ? 'Открыта' : 'Закрыта'}</span></td>
           <td>{canManage(row) ? <button type="button" className="link" aria-label={'Открыть ' + row.ticket} onClick={() => onEdit(row)}>Открыть</button> : <button type="button" className="link" aria-label={'Просмотреть ' + row.ticket} onClick={() => onEdit(row)}>Просмотреть</button>}{onClose && row.open && <button type="button" className="link incident-close" aria-label={'Закрыть аварию ' + row.ticket} disabled={deleting} onClick={() => onClose(row)}>Закрыть аварию</button>}{canManage(row) && <button type="button" className="link incident-delete" aria-label={'Удалить ' + row.ticket} disabled={deleting} onClick={() => onDelete(row)}>Удалить</button>}</td>
-        </tr>) : <tr><td colSpan={8} className="empty">{!query ? 'Дата окончания раньше даты начала.' : failed ? 'Не удалось загрузить аварии.' : !loaded ? 'Загрузка…' : 'За выбранный период аварий нет.'}</td></tr>}</tbody>
+        </tr>) : <tr><td colSpan={8} className="empty">{dateError ? dateError : failed ? 'Не удалось загрузить аварии.' : !loaded ? 'Загрузка…' : 'За выбранный период аварий нет.'}</td></tr>}</tbody>
       </table></div>
       <div className="foot report-pagination">
         <span role="status">{visibleRows.length
