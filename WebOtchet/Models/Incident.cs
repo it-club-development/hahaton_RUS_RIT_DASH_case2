@@ -3,6 +3,7 @@ namespace WebOtchet.Models;
 public class Incident
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Version { get; set; } = Guid.NewGuid();
     public string Pw { get; set; } = "";
     public string Direction { get; set; } = "";
     public string TechCenter { get; set; } = "";

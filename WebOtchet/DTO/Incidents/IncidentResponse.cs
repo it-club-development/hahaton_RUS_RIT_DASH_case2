@@ -23,7 +23,8 @@ public sealed record IncidentResponse(
     TimeSpan? CommonStationTime,
     string AlarmWho,
     string NoticeDescription,
-    Guid? CreatedByUserId)
+    Guid? CreatedByUserId,
+    Guid Version)
 {
     public static IncidentResponse FromEntity(Incident incident) => new(
         incident.Id,
@@ -46,6 +47,7 @@ public sealed record IncidentResponse(
         incident.CommonStationTime,
         incident.AlarmWho,
         incident.NoticeDescription,
-        incident.CreatedByUserId
+        incident.CreatedByUserId,
+        incident.Version
     );
 }

@@ -3,16 +3,17 @@
 .report-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
 .report-chart{padding:18px}
 .report-chart h3{margin:0 0 8px}
-.report-period,.downtime-day{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px}
+.report-period,.downtime-day{display:flex;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+.report-period select,.downtime-day input{margin-left:8px}
 #downtime-day-help{font-size:.875rem}
 .report-chart p{margin:0 0 12px}
-.chart-content{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
-.chart-content canvas{width:112px;height:112px}
+.chart-content{display:flex;flex-wrap:wrap;align-items:center}
+.chart-content canvas{width:112px;height:112px;margin:0 16px 8px 0}
 .chart-content ul{list-style:none;margin:0;padding:0;flex:1;min-width:150px}
 .chart-content li{margin:5px 0}
 .downtime-values{list-style:none;margin:0 0 12px;padding:0}
-.downtime-values li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #e1e8f2}
-.downtime-values strong{white-space:nowrap;font-variant-numeric:tabular-nums}
+.downtime-values li{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #e1e8f2}
+.downtime-values strong{margin-left:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .chart-key{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
 @media(max-width:780px){.report-charts{grid-template-columns:1fr}}
 

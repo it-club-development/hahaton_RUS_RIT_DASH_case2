@@ -15,6 +15,10 @@ namespace WebOtchet.Controllers.Api;
 public sealed class AccountController : ControllerBase
 {
     private readonly UserService _service;
+    private static readonly string BusinessTimeZone =
+        TimeZoneInfo.TryConvertWindowsIdToIanaId(TimeZoneInfo.Local.Id, out var ianaId)
+            ? ianaId
+            : TimeZoneInfo.Local.Id;
     private readonly IAntiforgery _antiforgery;
 
     public AccountController(
@@ -91,7 +95,8 @@ public sealed class AccountController : ControllerBase
         {
             user.Id,
             user.Username,
-            Role = user.Role.ToString()
+            Role = user.Role.ToString(),
+            TimeZone = BusinessTimeZone
         });
     }
 
@@ -108,7 +113,8 @@ public sealed class AccountController : ControllerBase
         {
             Id = id,
             Username = User.Identity?.Name,
-            Role = User.FindFirstValue(ClaimTypes.Role)
+            Role = User.FindFirstValue(ClaimTypes.Role),
+            TimeZone = BusinessTimeZone
         });
     }
 

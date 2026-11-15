@@ -174,12 +174,6 @@ public async Task<bool> UpdateDetailsAsync(
         );
     }
 
-    await EnsureAdministratorRemainsAsync(
-        existingUser,
-        role,
-        cancellationToken
-    );
-
     return await _repository.UpdateDetailsAsync(
         id,
         username,
@@ -257,20 +251,6 @@ var user = await _repository.GetByIdWithHashAsync(
         CancellationToken cancellationToken = default)
     {
         ValidateId(id);
-
-        var user = await _repository.GetByIdAsync(
-            id,
-            cancellationToken
-        );
-
-        if (user is null)
-            return false;
-
-        await EnsureAdministratorRemainsAsync(
-            user,
-            null,
-            cancellationToken
-        );
 
         return await _repository.DeleteAsync(
             id,
@@ -367,28 +347,4 @@ var user = await _repository.GetByIdWithHashAsync(
     }
 
 
-private async Task EnsureAdministratorRemainsAsync(
-    UserListItem existingUser,
-    Roles? newRole,
-    CancellationToken cancellationToken)
-{
-    if (existingUser.Role != Roles.Admin)
-        return;
-
-    if (newRole == Roles.Admin)
-        return;
-
-    int administratorCount =
-        await _repository.CountByRoleAsync(
-            Roles.Admin,
-            cancellationToken
-        );
-
-    if (administratorCount <= 1)
-    {
-        throw new ValidationException(
-            "Нельзя удалить или понизить последнего администратора."
-        );
-    }
-}
 }

@@ -127,10 +127,31 @@ public sealed class IncidentService
     }
 
 
-    public async Task<IncidentReportSummary> GetSummaryAsync(DateTime from, DateTime to,
-        IncidentReportFilter filter, CancellationToken cancellationToken)
+    public async IAsyncEnumerable<Incident> StreamReportAsync(DateTime from, DateTime to,
+        IncidentReportFilter filter, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ValidatePeriod(from, to);
+        var now = DateTime.Now;
+        await foreach (var incident in _repository.StreamByPeriod(from, to, filter).WithCancellation(cancellationToken))
+        {
+            RefreshLength(incident, now);
+            yield return incident;
+        }
+    }
+
+    public async Task<IncidentReportSummary> GetSummaryAsync(DateTime from, DateTime to,
+        IncidentReportFilter filter, CancellationToken cancellationToken, int? hours = null)
+    {
+        ValidatePeriod(from, to);
+        if (hours is { } window)
+        {
+            var now = DateTime.Now;
+            var start = now.AddHours(-window);
+            from = from > start ? from : start;
+            to = to < now ? to : now;
+            if (from >= to)
+                return new IncidentReportSummary(0, 0, 0, new Dictionary<string, long>());
+        }
         int open = 0, closed = 0, skipped = 0;
         var downtime = new Dictionary<string, long>();
         await foreach (var row in _repository.GetReportValues(from, to, filter).WithCancellation(cancellationToken))
@@ -295,8 +316,11 @@ public sealed class IncidentService
             errors
         );
 
-        if (incident.BeginTime == default)
-            errors.Add("Не указана дата начала аварии.");
+        if (incident.BeginTime.Year < 1000)
+            errors.Add("Год начала аварии должен быть не ранее 1000.");
+
+        if (incident.EndTime is { Year: < 1000 })
+            errors.Add("Год окончания аварии должен быть не ранее 1000.");
 
         if (incident.EndTime.HasValue &&
             incident.EndTime.Value < incident.BeginTime)
@@ -455,9 +479,9 @@ public sealed class IncidentService
         incident.CommonStationTime = totalTime;
     }
 
-    private static void RefreshLength(Incident incident)
+    private static void RefreshLength(Incident incident, DateTime? now = null)
     {
-        var duration = (incident.EndTime ?? DateTime.Now) - incident.BeginTime;
+        var duration = (incident.EndTime ?? now ?? DateTime.Now) - incident.BeginTime;
 
         if (duration < TimeSpan.Zero)
             duration = TimeSpan.Zero;

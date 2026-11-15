@@ -106,7 +106,34 @@ public async Task<User?> GetByIdWithHashAsync(
             cancellationToken
         );
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await SaveUserChangesAsync(cancellationToken);
+    }
+
+    private async Task SaveUserChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is MySqlException { Number: 1062 })
+        {
+            throw new WriteConflictException("Этот логин уже используется.");
+        }
+    }
+
+    // Lock the current administrators and the target before testing the invariant.
+    private async Task<User?> LockUserForRoleChangeAsync(Guid id, Roles? newRole, CancellationToken cancellationToken)
+    {
+        var userId = id.ToString("D");
+        var adminRole = (byte)Roles.Admin;
+        var users = await _context.Users.FromSqlInterpolated(
+            $"SELECT * FROM USERS WHERE ROLE = {adminRole} OR ID = {userId} ORDER BY ID FOR UPDATE")
+            .ToListAsync(cancellationToken);
+        var user = users.Find(item => item.Id == id);
+        if (user?.Role == Roles.Admin && newRole != Roles.Admin && users.Count(item => item.Role == Roles.Admin) <= 1)
+            throw new System.ComponentModel.DataAnnotations.ValidationException("Нельзя удалить или понизить последнего администратора.");
+
+        return user;
     }
 
     public async Task<bool> UpdateDetailsAsync(
@@ -115,11 +142,8 @@ public async Task<User?> GetByIdWithHashAsync(
         Roles role,
         CancellationToken cancellationToken = default)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken
-            );
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var user = await LockUserForRoleChangeAsync(id, role, cancellationToken);
 
         if (user is null)
             return false;
@@ -127,7 +151,8 @@ public async Task<User?> GetByIdWithHashAsync(
         user.Username = username.Trim();
         user.Role = role;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        await SaveUserChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return true;
     }
@@ -152,11 +177,8 @@ public async Task<User?> GetByIdWithHashAsync(
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        var user = await _context.Users
-            .FirstOrDefaultAsync(
-                x => x.Id == id,
-                cancellationToken
-            );
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        var user = await LockUserForRoleChangeAsync(id, null, cancellationToken);
 
         if (user is null)
             return false;
@@ -172,16 +194,7 @@ public async Task<User?> GetByIdWithHashAsync(
             throw new UserHasIncidentsException(exception);
         }
 
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
-public async Task<int> CountByRoleAsync(
-    Roles role,
-    CancellationToken cancellationToken = default)
-{
-    return await _context.Users
-        .CountAsync(
-            x => x.Role == role,
-            cancellationToken
-        );
-}
 }

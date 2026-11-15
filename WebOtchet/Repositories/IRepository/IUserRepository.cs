@@ -53,8 +53,4 @@ public interface IUserRepository
         Guid id,
         CancellationToken cancellationToken = default
     );
-    Task<int> CountByRoleAsync(
-    Roles role,
-    CancellationToken cancellationToken = default
-);
 }

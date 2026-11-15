@@ -19,6 +19,8 @@ public interface IIncidentRepository
         CancellationToken cancellationToken = default
     );
 
+    IAsyncEnumerable<Incident> StreamByPeriod(DateTime from, DateTime to, IncidentReportFilter filter);
+
     Task<int> CountByPeriodAsync(
         DateTime from,
         DateTime to,

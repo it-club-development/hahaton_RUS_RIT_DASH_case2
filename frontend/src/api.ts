@@ -1,3 +1,4 @@
+import { setBusinessTimeZone } from './data';
 import type { Incident } from './data';
 
 export type Profile = { id: string; username: string; role: 'Admin' | 'Engineer' | 'Attendant' };
@@ -8,7 +9,7 @@ export const roleLabels: Record<Profile['role'], string> = {
 };
 
 type ServerIncident = {
-  id: string; createdByUserId: string | null; pw: string; direction: string; techCenter: string; category: number;
+  id: string; version: string; createdByUserId: string | null; pw: string; direction: string; techCenter: string; category: number;
   networkType: string; serviceElement: string; numberOfBaseStations: string;
   equipmentType: string; alarmType: string; description: string; beginTime: string;
   endTime: string | null; akb: string | null; generatorTime: string | null;
@@ -44,11 +45,17 @@ async function write(path: string, method: string, payload?: object) {
   });
 }
 
+async function readSession(response: Response): Promise<Profile> {
+  const session = await response.json() as Profile & { timeZone: string };
+  setBusinessTimeZone(session.timeZone);
+  return session;
+}
+
 export async function getProfile(): Promise<Profile> {
-  return (await request('account/me')).json();
+  return readSession(await request('account/me'));
 }
 export async function login(username: string, password: string): Promise<Profile> {
-  return (await write('account/login', 'POST', { username, password })).json();
+  return readSession(await write('account/login', 'POST', { username, password }));
 }
 export async function logout() {
   await write('account/logout', 'POST');
@@ -62,7 +69,7 @@ export function fromTimeSpan(value: string | null) {
 }
 export function toTimeSpan(value?: string) {
   if (!value) return null;
-  const [hours, minutes, seconds] = value.split(':');
+  const [hours, minutes, seconds] = value.split(/[:.]/);
   const count = Number(hours);
   const days = Math.floor(count / 24);
   return (days ? days + '.' : '') + String(count % 24).padStart(2, '0') + ':' + minutes + ':' + seconds;
@@ -76,7 +83,7 @@ export async function loadIncidentPage(query: string, page: number, pageSize: nu
   const response = await request('reports/incidents?' + query + '&page=' + page + '&pageSize=' + pageSize, { signal });
   const batch = await response.json() as { items: ServerIncident[]; totalCount: number };
   const items: Incident[] = batch.items.map(row => ({
-    id: row.id, createdByUserId: row.createdByUserId, ticket: row.pw, direction: row.direction, center: row.techCenter,
+    id: row.id, version: row.version, createdByUserId: row.createdByUserId, ticket: row.pw, direction: row.direction, center: row.techCenter,
     category: String(row.category), network: row.networkType, element: row.serviceElement,
     stations: row.numberOfBaseStations, equipment: row.equipmentType, type: row.alarmType,
     description: row.description, start: row.beginTime, end: row.endTime || '', open: row.endTime === null,
@@ -104,6 +111,7 @@ export async function downloadReport(query: string) {
 
 export async function saveIncident(values: Omit<Incident, 'id'>, id?: string) {
   await write(id ? 'incidents/' + encodeURIComponent(id) : 'incidents', id ? 'PUT' : 'POST', {
+    version: id ? values.version : undefined,
     pw: values.ticket, direction: values.direction, techCenter: values.center, category: Number(values.category),
     networkType: values.network, serviceElement: values.element || '', numberOfBaseStations: values.stations,
     equipmentType: values.equipment || '', alarmType: values.type, description: values.description || '',

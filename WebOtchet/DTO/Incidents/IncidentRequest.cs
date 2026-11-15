@@ -34,8 +34,12 @@ public sealed class IncidentWriteRequest
     [MaxLength(450)]
     public string Description { get; init; } = "";
 
+    public Guid? Version { get; init; }
+
+    [Range(typeof(DateTime), "1000-01-01", "9999-12-31T23:59:59.9999999")]
     public DateTime BeginTime { get; init; }
 
+    [Range(typeof(DateTime), "1000-01-01", "9999-12-31T23:59:59.9999999")]
     public DateTime? EndTime { get; init; }
 
     public TimeSpan? Akb { get; init; }
@@ -53,6 +57,7 @@ public sealed class IncidentWriteRequest
     public Incident ToEntity(Guid? id = null) => new()
     {
         Id = id ?? Guid.NewGuid(),
+        Version = id.HasValue ? Version.GetValueOrDefault() : Guid.NewGuid(),
         Pw = Pw,
         Direction = Direction,
         TechCenter = TechCenter,

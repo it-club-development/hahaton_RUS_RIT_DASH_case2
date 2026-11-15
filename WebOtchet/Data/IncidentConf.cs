@@ -20,6 +20,13 @@ public sealed class IncidentConfiguration
             .HasConversion<string>()
             .ValueGeneratedNever();
 
+        builder.Property(x => x.Version)
+            .HasColumnName("ROW_VERSION")
+            .HasColumnType("char(36)")
+            .HasConversion<string>()
+            .ValueGeneratedNever()
+            .IsConcurrencyToken();
+
         builder.Property(x => x.Pw)
             .HasColumnName("PW")
             .HasMaxLength(450)

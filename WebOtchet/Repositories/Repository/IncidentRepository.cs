@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using WebOtchet.Data;
+using WebOtchet.Infrastructure;
 using WebOtchet.Models;
 using WebOtchet.DTO.Incidents;
 using WebOtchet.Repositories.IRepository;
@@ -64,16 +65,18 @@ public sealed class IncidentRepository : IIncidentRepository
         if (take <= 0)
             throw new ArgumentOutOfRangeException(nameof(take));
 
-        var query = GetPeriodQuery(from, to, filter);
-        var ordered = filter?.Sort == "asc"
-            ? query.OrderBy(x => x.BeginTime)
-            : query.OrderByDescending(x => x.BeginTime);
-        return await ordered
-            .ThenBy(x => x.Id)
+        return await OrderByStart(GetPeriodQuery(from, to, filter), filter)
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
     }
+
+    public IAsyncEnumerable<Incident> StreamByPeriod(DateTime from, DateTime to, IncidentReportFilter filter) =>
+        OrderByStart(GetPeriodQuery(from, to, filter), filter).AsAsyncEnumerable();
+
+    private static IOrderedQueryable<Incident> OrderByStart(IQueryable<Incident> query, IncidentReportFilter? filter) =>
+        (filter?.Sort == "asc" ? query.OrderBy(x => x.BeginTime) : query.OrderByDescending(x => x.BeginTime))
+        .ThenBy(x => x.Id);
 
     public async Task<int> CountByPeriodAsync(
         DateTime from,
@@ -122,12 +125,21 @@ public sealed class IncidentRepository : IIncidentRepository
         if (existing is null)
             return false;
 
-        incident.CreatedByUserId = existing.CreatedByUserId;
-        _context.Entry(existing)
-            .CurrentValues
-            .SetValues(incident);
+        if (existing.Version != incident.Version)
+            throw new WriteConflictException("Авария изменилась. Откройте её заново перед сохранением.");
 
-        await _context.SaveChangesAsync(cancellationToken);
+        incident.CreatedByUserId = existing.CreatedByUserId;
+        incident.Version = Guid.NewGuid();
+        _context.Entry(existing).CurrentValues.SetValues(incident);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new WriteConflictException("Авария изменилась. Откройте её заново перед сохранением.");
+        }
 
         return true;
     }
@@ -135,9 +147,11 @@ public sealed class IncidentRepository : IIncidentRepository
     public async Task<bool> CloseAsync(Incident incident, CancellationToken cancellationToken = default)
     {
         var id = incident.Id.ToString("D");
+        var version = Guid.NewGuid().ToString("D");
+        var expectedVersion = incident.Version.ToString("D");
         var updated = await _context.Database.ExecuteSqlInterpolatedAsync($@"
-            UPDATE INCIDENTS SET END_TIME = {incident.EndTime}, LENGHT = {incident.Length}
-            WHERE ID = {id} AND BEGIN_TIME = {incident.BeginTime}
+            UPDATE INCIDENTS SET END_TIME = {incident.EndTime}, LENGHT = {incident.Length}, ROW_VERSION = {version}
+            WHERE ID = {id} AND ROW_VERSION = {expectedVersion}
               AND (END_TIME IS NULL OR END_TIME = '0000-00-00 00:00:00')", cancellationToken);
 
         return updated == 1;

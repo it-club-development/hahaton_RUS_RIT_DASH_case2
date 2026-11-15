@@ -74,6 +74,9 @@ public sealed class IncidentsController : ControllerBase
         [FromBody] IncidentWriteRequest request,
         CancellationToken cancellationToken)
     {
+        if (request.Version is null)
+            return BadRequest(new ProblemDetails { Title = "Для изменения записи укажите её версию." });
+
         var incident = request.ToEntity(id);
 var currentUser = _currentUser.User;
 

@@ -71,6 +71,7 @@ export default function App() {
       reload(current => current + 1);
       setNotice('Инцидент ' + values.ticket + ' сохранён.');
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409) reload(current => current + 1);
       reportError(error);
     } finally {
       setSaving(false);

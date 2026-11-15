@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MySqlConnector;
 
 namespace WebOtchet.Infrastructure;
 
@@ -29,6 +31,17 @@ public sealed class ApiExceptionHandler : IExceptionHandler
             UnauthorizedAccessException => (
                 StatusCodes.Status403Forbidden,
                 "Доступ запрещён",
+                exception.Message
+            ),
+            MySqlException { Number: 1205 or 1213 } or
+            DbUpdateException { InnerException: MySqlException { Number: 1205 or 1213 } } => (
+                StatusCodes.Status409Conflict,
+                "Конфликт изменений",
+                "Данные заняты другим запросом. Повторите действие."
+            ),
+            WriteConflictException => (
+                StatusCodes.Status409Conflict,
+                "Конфликт изменений",
                 exception.Message
             ),
             UserHasIncidentsException => (

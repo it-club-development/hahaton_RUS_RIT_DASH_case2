@@ -15,7 +15,6 @@ namespace WebOtchet.Controllers.Api;
 [Authorize]
 public sealed class ReportsController : ControllerBase
 {
-    private const int ExportBatchSize = 200;
     private readonly IncidentService _service;
 
     public ReportsController(IncidentService service)
@@ -57,8 +56,9 @@ public sealed class ReportsController : ControllerBase
     [HttpGet("incidents/summary")]
     public async Task<ActionResult<IncidentReportSummary>> GetSummary(
         [FromQuery] DateTime from, [FromQuery] DateTime to,
-        [FromQuery] IncidentReportFilter filter, CancellationToken cancellationToken)
-        => Ok(await _service.GetSummaryAsync(from, to, filter, cancellationToken));
+        [FromQuery] IncidentReportFilter filter, [FromQuery, System.ComponentModel.DataAnnotations.Range(1, 720)] int? hours,
+        CancellationToken cancellationToken)
+        => Ok(await _service.GetSummaryAsync(from, to, filter, cancellationToken, hours));
 
     [HttpGet("incidents.csv")]
     [Produces("text/csv")]
@@ -82,34 +82,13 @@ public sealed class ReportsController : ControllerBase
             "Сетевой элемент", "Количество БС", "Тип оборудования", "Тип",
             "Описание", "Начало", "Окончание", "АКБ", "ГУ",
             "Длительность", "Время прерыва связи", "Общее время простоя БС",
-            "Уведомление об аварии", "Описание уведомления"
+            "Уведомление об аварии", "Подробное описание аварии"
         ];
 
         await writer.WriteLineAsync(string.Join(";", headers.Select(CsvEscape)));
 
-        var page = 1;
-        PageResult<Incident>? result;
-
-        do
-        {
-            result = await _service.GetReportAsync(
-                from,
-                to,
-                page,
-                ExportBatchSize,
-                cancellationToken,
-                filter
-            );
-
-            foreach (var incident in result.Items)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await writer.WriteLineAsync(ToCsvRow(incident));
-            }
-
-            page++;
-        }
-        while (page <= result.TotalPages);
+        await foreach (var incident in _service.StreamReportAsync(from, to, filter, cancellationToken))
+            await writer.WriteLineAsync(ToCsvRow(incident));
 
         await writer.FlushAsync(cancellationToken);
         stream.Position = 0;

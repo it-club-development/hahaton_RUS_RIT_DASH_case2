@@ -36,53 +36,67 @@ function dayAfter(day: string) {
   return date.toISOString().slice(0, 10);
 }
 
-function reportTimestamp(milliseconds: number) {
-  const date = new Date(milliseconds);
-  return new Date(milliseconds - date.getTimezoneOffset() * 60000).toISOString().slice(0, 23);
-}
-
 type ReportProps = { query: string | null; revision: number; onError: (error: unknown) => void };
+
+const emptySummary: ReportSummary = { open: 0, closed: 0, skipped: 0, downtimeByDirection: {} };
 
 function useSummary({ query, revision, onError }: ReportProps, period: string, day = '') {
   const errorHandler = useRef(onError);
   errorHandler.current = onError;
-  const [summary, setSummary] = useState<ReportSummary | null>(null);
+  const key = JSON.stringify([query, revision, period, day]);
+  const [result, setResult] = useState<{ key: string; summary?: ReportSummary }>();
 
   useEffect(() => {
-    setSummary(null);
     if (!query) return;
     const params = new URLSearchParams(query);
-    let from = params.get('from')!;
-    let to = params.get('to')!;
     if (day) {
-      from = from > day ? from : day;
+      const from = params.get('from')!;
+      const to = params.get('to')!;
       const next = dayAfter(day);
-      to = to < next ? to : next;
+      params.set('from', from > day ? from : day);
+      params.set('to', to < next ? to : next);
     }
-    if (period) {
-      const now = Date.now();
-      const start = reportTimestamp(now - Number(period) * 3600000);
-      const end = reportTimestamp(now);
-      from = from > start ? from : start;
-      to = to < end ? to : end;
+    if (params.get('from')! >= params.get('to')!) {
+      setResult({ key, summary: emptySummary });
+      return;
     }
-    if (from >= to) return;
-    params.set('from', from);
-    params.set('to', to);
-    const controller = new AbortController();
-    loadReportSummary(params.toString(), controller.signal)
-      .then(value => { if (!controller.signal.aborted) setSummary(value); })
-      .catch(error => { if (!controller.signal.aborted) errorHandler.current(error); });
-    return () => controller.abort();
-  }, [query, revision, period, day]);
+    if (period) params.set('hours', period);
+    let controller: AbortController | undefined;
 
-  return summary;
+    async function refresh() {
+      if (controller) return;
+      const pending = new AbortController();
+      controller = pending;
+      try {
+        const summary = await loadReportSummary(params.toString(), pending.signal);
+        if (!pending.signal.aborted) setResult({ key, summary });
+      } catch (error) {
+        if (!pending.signal.aborted) {
+          setResult({ key });
+          errorHandler.current(error);
+        }
+      } finally {
+        controller = undefined;
+      }
+    }
+
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 30_000);
+    return () => {
+      window.clearInterval(timer);
+      controller?.abort();
+    };
+  }, [key, query, period, day]);
+
+  if (!query) return { summary: emptySummary, status: '' };
+  if (result?.key !== key) return { status: 'Загрузка сводки…' };
+  return { summary: result.summary, status: result.summary ? '' : 'Не удалось загрузить сводку.' };
 }
 
 function StatusChart(props: ReportProps) {
   const [period, setPeriod] = useState('');
   const canvas = useRef<HTMLCanvasElement>(null);
-  const summary = useSummary(props, period);
+  const { summary, status } = useSummary(props, period);
   const open = summary?.open ?? 0;
   const total = open + (summary?.closed ?? 0);
 
@@ -108,8 +122,8 @@ function StatusChart(props: ReportProps) {
   return <section className="panel report-chart">
     <h3>Аварии по статусу</h3>
     <PeriodSelect value={period} onChange={setPeriod} />
-    <p aria-live="polite">{total ? 'Открытых аварий: ' + open : 'За выбранный период записей нет'}</p>
-    <div className="chart-content">
+    <p aria-live="polite">{status || (total ? 'Открытых аварий: ' + open : 'За выбранный период записей нет')}</p>
+    <div className="chart-content" hidden={Boolean(status)} style={status ? { display: 'none' } : undefined}>
       <canvas ref={canvas} width="224" height="224" aria-hidden="true" />
       <ul>{[['Открытые', open], ['Закрытые', total - open]].map(([label, count], index) => <li key={label}>
         <span className="chart-key" style={{ backgroundColor: colors[index] }} aria-hidden="true" />{label} — {count}
@@ -121,7 +135,7 @@ function StatusChart(props: ReportProps) {
 function DowntimeSummary(props: ReportProps) {
   const [period, setPeriod] = useState('');
   const [day, setDay] = useState('');
-  const summary = useSummary(props, period, day);
+  const { summary, status } = useSummary(props, period, day);
   const skipped = summary?.skipped ?? 0;
   const sorted = Object.entries(summary?.downtimeByDirection ?? {}).sort((a, b) => b[1] - a[1]);
   const total = sorted.reduce((sum, [, seconds]) => sum + seconds, 0);
@@ -129,8 +143,8 @@ function DowntimeSummary(props: ReportProps) {
     <h3>Суммарный простой БС по направлениям</h3>
     <PeriodSelect value={period} onChange={setPeriod} />
     <label className="downtime-day">Дата начала аварии<input type="date" value={day} onChange={event => setDay(event.target.value)} aria-describedby="downtime-day-help" /></label>
-    <p id="downtime-day-help">Период и дата фильтруют записи таблицы по времени начала аварии.</p>
-    <p aria-live="polite">{sorted.length ? 'Всего (чч:мм:сс): ' + clock(total) : skipped ? 'Нет данных для расчёта' : 'За выбранный период аварий нет'}</p>
+    <p id="downtime-day-help">Период и дата уточняют сводку по времени начала аварии.</p>
+    <p aria-live="polite">{status || (sorted.length ? 'Всего (чч:мм:сс): ' + clock(total) : skipped ? 'Нет данных для расчёта' : 'За выбранный период аварий нет')}</p>
     <ul className="downtime-values" aria-label="Простой по направлениям">
       {sorted.map(([direction, seconds]) => <li key={direction}>{direction}<strong>{clock(seconds)}</strong></li>)}
     </ul>

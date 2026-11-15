@@ -148,6 +148,13 @@ namespace WebOtchet.Migrations
                         .HasColumnName("TEHC")
                         .HasMySqlValueGenerationStrategy(MySqlValueGenerationStrategy.None);
 
+                    b.Property<string>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("char(36)")
+                        .HasColumnName("ROW_VERSION")
+                        .HasMySqlValueGenerationStrategy(MySqlValueGenerationStrategy.None);
+
                     b.HasKey("Id");
 
                     b.HasIndex("BeginTime")
